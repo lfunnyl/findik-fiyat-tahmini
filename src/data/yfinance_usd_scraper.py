@@ -1,4 +1,4 @@
-import os
+﻿import os
 import yfinance as yf
 import pandas as pd
 import logging
@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class HistoricalUSDScraper:
-    def __init__(self, years=5):
+    def __init__(self, years=13):
         # Yahoo Finance'de USD/TRY paritesinin kodu "TRY=X" tir.
         self.ticker = "TRY=X" 
         self.period = f"{years}y"
@@ -64,7 +64,7 @@ class HistoricalUSDScraper:
 
 if __name__ == "__main__":
     logger.info("Geçmiş Döviz Verisi Boru Hattı Başlatıldı...")
-    scraper = HistoricalUSDScraper(years=5)
+    scraper = HistoricalUSDScraper(years=13)
     df_history = scraper.fetch_data()
     scraper.save_to_csv(df_history)
     logger.info("İşlem Tamamlandı.")

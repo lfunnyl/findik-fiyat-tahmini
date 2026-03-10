@@ -1,4 +1,4 @@
-import os
+﻿import os
 import yfinance as yf
 import pandas as pd
 import logging
@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class MacroDataScraper:
-    def __init__(self, years=5):
+    def __init__(self, years=13):
         # Tarımsal maliyet triumviratı:
         # 1. BZ=F  (Brent Petrol)   → Mazot, nakliye, gübre üretim maliyeti
         # 2. GC=F  (Altın Ons)      → Çiftçi güvenli limanı, enflasyon göstergesi
@@ -80,7 +80,7 @@ class MacroDataScraper:
 
 if __name__ == "__main__":
     logger.info("Makro Veri Boru Hattı Başlatıldı...")
-    scraper = MacroDataScraper(years=5)
+    scraper = MacroDataScraper(years=13)
     df_macro = scraper.fetch_data()
     scraper.save_to_csv(df_macro)
     logger.info("İşlem Tamamlandı.")

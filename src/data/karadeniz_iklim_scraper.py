@@ -1,4 +1,4 @@
-import os
+﻿import os
 import requests
 import pandas as pd
 import logging
@@ -32,7 +32,7 @@ class KaradenizIklimScraper:
         "Trabzon": (41.00, 39.72),
     }
 
-    def __init__(self, yil_sayisi=5):
+    def __init__(self, yil_sayisi=13):
         self.end_date   = datetime.now().strftime('%Y-%m-%d')
         self.start_date = (datetime.now() - timedelta(days=yil_sayisi * 365)).strftime('%Y-%m-%d')
 
@@ -121,7 +121,7 @@ class KaradenizIklimScraper:
 
 if __name__ == "__main__":
     logger.info("Karadeniz İklim Verisi Boru Hattı Başlatıldı...")
-    scraper = KaradenizIklimScraper(yil_sayisi=5)
+    scraper = KaradenizIklimScraper(yil_sayisi=13)
     df = scraper.fetch_ortalama()
     scraper.save_to_csv(df)
     logger.info("İşlem Tamamlandı.")
