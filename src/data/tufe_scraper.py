@@ -42,8 +42,16 @@ class TUFEScraper:
             if not gozlemler:
                 raise ValueError("Boş yanıt geldi.")
 
-            df = pd.DataFrame(gozlemler).sort_values("Yil")
-            logger.info(f"World Bank'tan {len(df)} yıllık TÜFE verisi alındı.")
+            df_api = pd.DataFrame(gozlemler)
+            df_fallback = self._fallback(start_yil)
+
+            # Eksik yılları fallback'ten tamamla (Özellikle 2025-2026 henüz API'de yoksa)
+            eksik_yillar = set(df_fallback["Yil"]) - set(df_api["Yil"])
+            df_eksik = df_fallback[df_fallback["Yil"].isin(eksik_yillar)]
+
+            df = pd.concat([df_api, df_eksik]).sort_values("Yil").reset_index(drop=True)
+
+            logger.info(f"World Bank API ve bilinen verilerden toplam {len(df)} yıllık TÜFE verisi alındı.")
             return df
 
         except Exception as e:
@@ -53,9 +61,10 @@ class TUFEScraper:
     def _fallback(self, start_yil):
         """World Bank erişilemezse bilinen TÜİK bazlı yıllık TÜFE değerleri."""
         bilinen = {
+            2013: 7.40, 2014: 8.17,
             2015: 7.67, 2016: 7.78, 2017: 11.14, 2018: 20.30,
             2019: 15.18, 2020: 12.28, 2021: 19.60, 2022: 72.31,
-            2023: 64.77, 2024: 52.00, 2025: 38.00,  # 2025 tahmini
+            2023: 64.77, 2024: 52.00, 2025: 38.00, 2026: 25.00  # 2025 ve 2026 projeksiyon
         }
         donusum = [{"Yil": y, "TUFE_Yillik_Pct": v}
                    for y, v in bilinen.items() if y >= start_yil]
@@ -79,6 +88,6 @@ class TUFEScraper:
 if __name__ == "__main__":
     logger.info("TÜFE Veri Boru Hattı Başlatıldı...")
     scraper = TUFEScraper()
-    df = scraper.fetch(start_yil=2015)
+    df = scraper.fetch(start_yil=2013)
     scraper.save_to_csv(df)
     logger.info("İşlem Tamamlandı.")

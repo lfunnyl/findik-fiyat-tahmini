@@ -1,4 +1,4 @@
-﻿import os
+import os
 import yfinance as yf
 import pandas as pd
 import logging
@@ -9,15 +9,16 @@ logger = logging.getLogger(__name__)
 
 class MacroDataScraper:
     def __init__(self, years=13):
-        # Tarımsal maliyet triumviratı:
+        # Tarımsal maliyet ve ikame triumviratı:
         # 1. BZ=F  (Brent Petrol)   → Mazot, nakliye, gübre üretim maliyeti
         # 2. GC=F  (Altın Ons)      → Çiftçi güvenli limanı, enflasyon göstergesi
-        # 3. UNG   (Natural Gas ETF) → Doğalgaz = Azotlu gübre üretiminin hammaddesi
-        #    (Avrupa'da azotlu gübre, Rus doğalgazıyla yapılır — fındığa direk etkisi var)
+        # 3. UNG   (Natural Gas ETF) → Doğalgaz = Azotlu gübre üretimi
+        # 4. CC=F  (Kakao Futures)  → Çikolata endüstrisinde fındığın ikamesi/tamamlayıcısı
         self.tickers = {
             "Brent_Petrol": "BZ=F",
             "Altin_Ons":    "GC=F",
-            "Dogalgaz_ETF": "UNG",   # United States Natural Gas Fund (gübre maliyeti proxy)
+            "Dogalgaz_ETF": "UNG",
+            "Kakao":        "CC=F"
         }
         self.period = f"{years}y"
         
