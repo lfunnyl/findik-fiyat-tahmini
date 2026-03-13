@@ -534,6 +534,23 @@ with col_tmo_r:
     </div>
     """, unsafe_allow_html=True)
 
+    tmo_pred_data = load_tmo_prediction()
+    tmo_model_pred = int(tmo_pred_data['pred_2026']) if tmo_pred_data else 225
+    tmo_ci_low     = int(tmo_pred_data['ci_p25'])    if tmo_pred_data else 180
+    tmo_ci_high    = int(tmo_pred_data['ci_p75'])    if tmo_pred_data else 270
+    tmo_mape       = tmo_pred_data['mape_loo']       if tmo_pred_data else None
+
+    # Model tahmini badge
+    st.markdown(f"""
+    <div style="background:rgba(124,106,247,0.1); border:1px solid rgba(124,106,247,0.3);
+                border-radius:12px; padding:12px 18px; margin-bottom:14px;">
+        <span style="font-size:0.78rem; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em;">ML Model Tahmini</span><br>
+        <span style="font-size:1.5rem; font-weight:700; color:#7c6af7;">≈ {tmo_model_pred} TL/kg</span>
+        <span style="color:rgba(255,255,255,0.4); font-size:0.82rem;"> &nbsp;[%50 CI: {tmo_ci_low}–{tmo_ci_high} TL]</span><br>
+        <span style="font-size:0.78rem; color:rgba(255,255,255,0.4);">LOO-CV MAPE: %{tmo_mape:.1f} &nbsp;·&nbsp; Ridge Regresyon · 2013–2025 gecmis verisi</span>
+    </div>
+    """, unsafe_allow_html=True)
+
     tmo_taban = st.slider(
         "TMO Taban Fiyati (TL/kg) — Beklenti",
         min_value=100, max_value=450, value=225, step=5,
