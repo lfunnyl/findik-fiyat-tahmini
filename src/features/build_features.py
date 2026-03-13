@@ -19,6 +19,29 @@ logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PROC_DIR = os.path.join(BASE_DIR, "data", "processed")
 
+# ─── US CPI (All Items, 2024 Baz Yılı = 100) ────────────────────────────────
+# Kaynak: U.S. Bureau of Labor Statistics (BLS) - CPI-U Annual Averages
+# Baz yılı 2024 alındı (2024 = 100.0). Eski yıllar daha düşük görünür.
+# Reel Fiyat = Nominal Fiyat × (CPI_Baz / CPI_YilX)
+# Bu dönüşüm, 2013'teki 1 USD'yi 2024 alım gücüyle ölçmenizi sağlar.
+US_CPI_TABLE = {
+    2013: 69.04,  # 2024=100 bazıyla normalize edilmiş yak. değerler
+    2014: 70.14,
+    2015: 70.25,
+    2016: 71.19,
+    2017: 72.67,
+    2018: 74.38,
+    2019: 75.71,
+    2020: 76.34,
+    2021: 80.30,
+    2022: 88.54,
+    2023: 94.17,
+    2024: 100.00,
+    2025: 102.80,  # Tahmin (yıllık ~%2.8 enflasyon)
+    2026: 105.70,  # Tahmin
+}
+CPI_BAZ_YILI = 2024
+
 def load_clean_data(filename):
     filepath = os.path.join(PROC_DIR, filename)
     if not os.path.exists(filepath):
@@ -121,8 +144,18 @@ def build_features():
     # ── FEATURE ENGINEERING (Özellik Türetimi) ──
     logger.info("Yeni özellikler türetiliyor (Feature Engineering)...")
 
-    # 1. USD Bazlı Fiyat (Dolar bazında fındık fiyatı nasıl hareket etti?)
+    # 1. USD Bazlı Fiyat - O dönemin kuru kullanılır (zaten aylık ortalama)
     df_master['Fiyat_USD_kg'] = df_master['Serbest_Piyasa_TL_kg'] / df_master['USD_TRY_Kapanis']
+
+    # 1b. Reel USD Fiyatı (ABD enflasyonundan arındırılmış, 2024 baz yıllı)
+    # Formül: Reel_Fiyat = Nominal_USD × (CPI_2024 / CPI_YilX)
+    # Yüksek CPI yılları fiyatı aşağı çeker → satın alma gücü bazlı karşılaştırma
+    cpi_baz = US_CPI_TABLE[CPI_BAZ_YILI]
+    df_master['US_CPI_Carpani'] = df_master['Yil'].map(
+        lambda y: cpi_baz / US_CPI_TABLE.get(int(y), cpi_baz)
+    )
+    df_master['Fiyat_RealUSD_kg'] = df_master['Fiyat_USD_kg'] * df_master['US_CPI_Carpani']
+    logger.info("Reel USD fiyatı (2024 baz) oluşturuldu: Fiyat_RealUSD_kg")
 
     # 2. Döviz ve Makro Momentum Özellikleri
     df_master['Kur_Aylik_Degisim_Pct'] = df_master['USD_TRY_Kapanis'].pct_change() * 100
