@@ -24,6 +24,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import joblib
+import mlflow
+import mlflow.sklearn
 
 from sklearn.linear_model import Ridge, RidgeCV
 from sklearn.preprocessing import StandardScaler
@@ -267,9 +269,15 @@ def main():
     logger.info("TMO TABAN FIYATI TAHMIN MODELI (Ridge LOO-CV)")
     logger.info("=" * 55)
 
-    model, scaler, metrics, oof_pred, y_orig, coef_df = train_tmo_model(tmo_df, feature_cols)
+    mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    mlflow.set_experiment("Findik_Fiyat_Modelleri")
 
-    logger.info("\n2026 TMO Tahmini:")
+    with mlflow.start_run(run_name="TMO_Taban_Modeli"):
+        model, scaler, metrics, oof_pred, y_orig, coef_df = train_tmo_model(tmo_df, feature_cols)
+        mlflow.log_metrics({"LOO_MAPE": metrics['mape'], "LOO_MAE": metrics['mae'], "LOO_R2": metrics['r2']})
+
+        logger.info("\n2026 TMO Tahmini:")
+
     pred_2026, input_vals = predict_tmo_2026(model, scaler, feature_cols, tmo_df)
     ci = bootstrap_tmo_ci(model, scaler, feature_cols, input_vals)
 

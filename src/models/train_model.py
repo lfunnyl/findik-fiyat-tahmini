@@ -27,6 +27,9 @@ import logging
 import joblib
 import numpy as np
 import pandas as pd
+import mlflow
+import mlflow.sklearn
+import mlflow.xgboost
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -255,7 +258,9 @@ def train_baseline(X_train, X_test, y_train_log, y_test_raw):
     preds_log = ridge.predict(X_te_s)
 
     scores = metrics_log(np.log1p(y_test_raw), preds_log, prefix="Ridge Baseline (Test)")
+    joblib.dump({'model': ridge, 'features': sel_cols, 'scaler': scaler}, os.path.join(MODELS_DIR, 'ridge_model.pkl'))
     return scores['y_pred_orig'], scores
+
 
 
 # ─── ADIM 2: XGBoost ────────────────────────────────────────────────────────
@@ -455,35 +460,54 @@ def main():
     all_scores = {}
     all_preds  = {}
 
+    mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    mlflow.set_experiment("Findik_Fiyat_Modelleri")
+
+
     # 1. Baseline
-    preds_ridge, sc_ridge = train_baseline(X_train, X_test, y_train_log, y_test_raw)
-    all_scores['Ridge Baseline'] = sc_ridge
-    all_preds['Ridge Baseline']  = preds_ridge
+    with mlflow.start_run(run_name="Ridge_Baseline"):
+        preds_ridge, sc_ridge = train_baseline(X_train, X_test, y_train_log, y_test_raw)
+        mlflow.log_metrics({"Test_R2": sc_ridge['R2'], "Test_MAE": sc_ridge['MAE'], 
+                            "Test_RMSE": sc_ridge['RMSE'], "Test_MAPE": sc_ridge['MAPE']})
+        all_scores['Ridge Baseline'] = sc_ridge
+        all_preds['Ridge Baseline']  = preds_ridge
 
     # 2. XGBoost
-    xgb_model, xgb_cols, preds_xgb, sc_xgb = train_xgboost(
-        X, y_log, X_train, X_test, y_train_log, y_test_raw
-    )
-    all_scores['XGBoost'] = sc_xgb
-    all_preds['XGBoost']  = preds_xgb
+    with mlflow.start_run(run_name="XGBoost_Default"):
+        xgb_model, xgb_cols, preds_xgb, sc_xgb = train_xgboost(
+            X, y_log, X_train, X_test, y_train_log, y_test_raw
+        )
+        mlflow.log_metrics({"Test_R2": sc_xgb['R2'], "Test_MAE": sc_xgb['MAE'], 
+                            "Test_RMSE": sc_xgb['RMSE'], "Test_MAPE": sc_xgb['MAPE']})
+        all_scores['XGBoost'] = sc_xgb
+        all_preds['XGBoost']  = preds_xgb
 
     # 3. LightGBM + SHAP
-    lgb_model, lgb_cols, preds_lgb, sc_lgb = train_lightgbm(
-        X, y_log, X_train, X_test, y_train_log, y_test_raw
-    )
-    all_scores['LightGBM'] = sc_lgb
-    all_preds['LightGBM']  = preds_lgb
+    with mlflow.start_run(run_name="LightGBM_Default"):
+        lgb_model, lgb_cols, preds_lgb, sc_lgb = train_lightgbm(
+            X, y_log, X_train, X_test, y_train_log, y_test_raw
+        )
+        mlflow.log_metrics({"Test_R2": sc_lgb['R2'], "Test_MAE": sc_lgb['MAE'], 
+                            "Test_RMSE": sc_lgb['RMSE'], "Test_MAPE": sc_lgb['MAPE']})
+        all_scores['LightGBM'] = sc_lgb
+        all_preds['LightGBM']  = preds_lgb
 
     # 4. Optuna
-    preds_xgb_o, sc_xgb_o, preds_lgb_o, sc_lgb_o = optuna_optimize(
-        X_train, X_test, y_train_log, y_test_raw, xgb_cols, n_trials=50
-    )
-    all_scores['XGBoost (Optuna)']  = sc_xgb_o
-    all_scores['LightGBM (Optuna)'] = sc_lgb_o
-    all_preds['XGBoost (Optuna)']   = preds_xgb_o
-    all_preds['LightGBM (Optuna)']  = preds_lgb_o
+    with mlflow.start_run(run_name="Optuna_Best_Models"):
+        preds_xgb_o, sc_xgb_o, preds_lgb_o, sc_lgb_o = optuna_optimize(
+            X_train, X_test, y_train_log, y_test_raw, xgb_cols, n_trials=50
+        )
+        # Sadece XGBoost Optuna'nin sonuclarini bu run'a yazalim
+        mlflow.log_metrics({"Test_R2_XGB_Optuna": sc_xgb_o['R2'], "Test_MAE_XGB_Optuna": sc_xgb_o['MAE'], 
+                            "Test_MAPE_XGB_Optuna": sc_xgb_o['MAPE']})
+        
+        all_scores['XGBoost (Optuna)']  = sc_xgb_o
+        all_scores['LightGBM (Optuna)'] = sc_lgb_o
+        all_preds['XGBoost (Optuna)']   = preds_xgb_o
+        all_preds['LightGBM (Optuna)']  = preds_lgb_o
 
     # Tahmin Grafiği
+
     plot_predictions(y_test_raw, all_preds, dates_test)
 
     # Özet

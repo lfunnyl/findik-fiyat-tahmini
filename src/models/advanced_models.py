@@ -35,6 +35,8 @@ from sklearn.preprocessing import StandardScaler
 import xgboost as xgb
 import lightgbm as lgb
 from scipy.optimize import minimize
+import mlflow
+import mlflow.sklearn
 
 warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -427,31 +429,49 @@ def main():
         'Ridge':    base_preds['Ridge'][0],
     }
 
+    mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    mlflow.set_experiment("Findik_Fiyat_Modelleri")
+
     # 1. Weighted Ensemble
-    pred_weighted, sc_weighted, _ = weighted_ensemble(base_preds, y_test_raw)
-    all_scores['Weighted Ensemble'] = sc_weighted
-    all_preds['Weighted Ensemble']  = pred_weighted
+    with mlflow.start_run(run_name="Weighted_Ensemble"):
+        pred_weighted, sc_weighted, _ = weighted_ensemble(base_preds, y_test_raw)
+        mlflow.log_metrics({"Test_R2": sc_weighted['R2'], "Test_MAE": sc_weighted['MAE'], 
+                            "Test_RMSE": sc_weighted['RMSE'], "Test_MAPE": sc_weighted['MAPE']})
+        all_scores['Weighted Ensemble'] = sc_weighted
+        all_preds['Weighted Ensemble']  = pred_weighted
 
     # 2. Stacking Ensemble
-    pred_stack, sc_stack = stacking_ensemble(base_preds, X_tr, X_te, y_train_log, y_test_raw, scaler)
-    all_scores['Stacking Ensemble'] = sc_stack
-    all_preds['Stacking Ensemble']  = pred_stack
+    with mlflow.start_run(run_name="Stacking_Ensemble"):
+        pred_stack, sc_stack = stacking_ensemble(base_preds, X_tr, X_te, y_train_log, y_test_raw, scaler)
+        mlflow.log_metrics({"Test_R2": sc_stack['R2'], "Test_MAE": sc_stack['MAE'], 
+                            "Test_RMSE": sc_stack['RMSE'], "Test_MAPE": sc_stack['MAPE']})
+        all_scores['Stacking Ensemble'] = sc_stack
+        all_preds['Stacking Ensemble']  = pred_stack
 
     # 3. FLAML AutoML (90 saniye bütçe)
-    pred_flaml, sc_flaml = flaml_automl(X_tr, X_te, y_train_log, y_test_raw, time_budget=90)
-    all_scores['FLAML AutoML'] = sc_flaml
-    all_preds['FLAML AutoML']  = pred_flaml
+    with mlflow.start_run(run_name="FLAML_AutoML"):
+        pred_flaml, sc_flaml = flaml_automl(X_tr, X_te, y_train_log, y_test_raw, time_budget=90)
+        if sc_flaml:
+            mlflow.log_metrics({"Test_R2": sc_flaml['R2'], "Test_MAE": sc_flaml['MAE'], 
+                                "Test_RMSE": sc_flaml['RMSE'], "Test_MAPE": sc_flaml['MAPE']})
+        all_scores['FLAML AutoML'] = sc_flaml
+        all_preds['FLAML AutoML']  = pred_flaml
 
     # 4. N-BEATS
-    pred_nbeats, sc_nbeats = nbeats_model(y_test_raw, dates_test, df_raw)
-    all_scores['N-BEATS'] = sc_nbeats
-    all_preds['N-BEATS']  = pred_nbeats
+    with mlflow.start_run(run_name="NBEATS"):
+        pred_nbeats, sc_nbeats = nbeats_model(y_test_raw, dates_test, df_raw)
+        if sc_nbeats:
+            mlflow.log_metrics({"Test_R2": sc_nbeats['R2'], "Test_MAE": sc_nbeats['MAE'], 
+                                "Test_RMSE": sc_nbeats['RMSE'], "Test_MAPE": sc_nbeats['MAPE']})
+        all_scores['N-BEATS'] = sc_nbeats
+        all_preds['N-BEATS']  = pred_nbeats
 
     # Karşılaştırma Grafiği
     plot_comparison(y_test_raw, all_preds, dates_test, all_scores)
 
     # Final Özet
     print_summary(all_scores)
+
 
     # En iyi modeli kaydet
     valid = {k: v for k, v in all_scores.items() if v is not None}
