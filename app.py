@@ -162,8 +162,20 @@ def load_history():
     df['RealUSD_Lag3'] = df['Fiyat_RealUSD_kg'].shift(3)
     return df.bfill().ffill()
 
+@st.cache_data(show_spinner="Performans loglari okunuyor...")
+def load_performance_log():
+    log_path = os.path.join(BASE_DIR, "data", "performance_log.csv")
+    if os.path.exists(log_path):
+        try:
+            log_df = pd.read_csv(log_path)
+            if not log_df.empty:
+                return log_df.iloc[-1].to_dict()
+        except:
+            pass
+    return None
 
 # ─── Yardımcı Fonksiyonlar ────────────────────────────────────────────────────
+
 
 def get_feature_cols(df):
     drop_existing = [c for c in DROP_COLS if c in df.columns]
@@ -302,10 +314,12 @@ st.markdown("<br>", unsafe_allow_html=True)
 try:
     xgb_m, lgb_m, feat_cols, weights = load_models()
     df = load_history()
+    perf_log = load_performance_log()
     sel_cols, _ = get_feature_cols(df)
 except Exception as e:
     st.error(f"Model veya veri yuklenemedi: {e}")
     st.stop()
+
 
 # Tahminler
 with st.spinner("2026 tahminleri hesaplaniyor..."):
@@ -317,7 +331,7 @@ nisan_tl   = pred_df.iloc[0]['TL']
 aralik_tl  = pred_df.iloc[-1]['TL']
 yillik_ort = pred_df['TL'].mean()
 
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
     st.metric("Nisan 2026 Tahmini", f"{nisan_tl:.1f} TL/kg",
               delta=f"+{nisan_tl - son_tl:.1f} TL" if son_tl else None)
@@ -330,6 +344,15 @@ with c3:
 with c4:
     st.metric("Son Gercek Fiyat (Mar-26)",
               f"{son_tl:.1f} TL/kg" if son_tl else f"{usd_try:.2f} USD/TRY")
+with c5:
+    if perf_log:
+        hata_orani = perf_log.get('MAPE_Pct', 0)
+        st.metric("Gecen Ayki Model Hatasi", f"%{hata_orani:.1f}", 
+                  delta="-İyi" if hata_orani < 15 else ("-Kabul Edilebilir" if hata_orani < 25 else "-Yüksek Sapma"),
+                  delta_color="inverse", help="Modelin gecen ayki tahmini ile gerceklesme arasindaki sapma orani (OOS Yuzde Hata)")
+    else:
+        st.metric("Gecen Ayki Model Hatasi", "Hesaplaniyor..", help="Gelecek guncellemedeaktif olacak")
+
 
 st.markdown("<br>", unsafe_allow_html=True)
 
