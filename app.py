@@ -176,6 +176,16 @@ def load_performance_log():
 
 # ─── Yardımcı Fonksiyonlar ────────────────────────────────────────────────────
 
+@st.cache_data(show_spinner="TMO tahmini okunuyor...")
+def load_tmo_prediction():
+    tmo_path = os.path.join(BASE_DIR, "models", "tmo_prediction_2026.json")
+    if os.path.exists(tmo_path):
+        try:
+            with open(tmo_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return None
 
 def get_feature_cols(df):
     drop_existing = [c for c in DROP_COLS if c in df.columns]
