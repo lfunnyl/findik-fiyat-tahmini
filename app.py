@@ -144,7 +144,12 @@ def load_models():
     lgb_bundle = joblib.load(os.path.join(MODELS_DIR, 'lightgbm_model.pkl'))
     with open(os.path.join(MODELS_DIR, 'ensemble_weights.json'), 'r') as f:
         weights = json.load(f)
-    return xgb_bundle['model'], lgb_bundle['model'], xgb_bundle['features'], weights
+        
+    ms_1 = joblib.load(os.path.join(MODELS_DIR, 'multistep_1m.pkl'))
+    ms_3 = joblib.load(os.path.join(MODELS_DIR, 'multistep_3m.pkl'))
+    ms_6 = joblib.load(os.path.join(MODELS_DIR, 'multistep_6m.pkl'))
+    
+    return xgb_bundle['model'], lgb_bundle['model'], xgb_bundle['features'], weights, ms_1, ms_3, ms_6
 
 
 @st.cache_data(show_spinner="Gecmis veriler okunuyor...")
@@ -211,20 +216,20 @@ def predict_single(xgb_m, lgb_m, weights, row_dict, kur, yil=2026):
     return reel, nom, tl
 
 
-def bootstrap_ci_fast(xgb_m, lgb_m, weights, row_dict, kur, yil=2026, n=200, noise=0.025):
-    base = np.array([list(row_dict.values())])
-    keys = list(row_dict.keys())
-    rng = np.random.default_rng(42)
-    preds = []
-    for _ in range(n):
-        noisy = base * (1 + rng.normal(0, noise, base.shape))
-        r = pd.DataFrame(noisy, columns=keys)
-        p_xgb = np.expm1(xgb_m.predict(r)[0])
-        p_lgb = np.expm1(lgb_m.predict(r)[0])
-        en = weights['XGBoost'] * p_xgb + weights['LightGBM'] * p_lgb + weights['Ridge'] * p_xgb
-        _, tl = reel_usd_to_tl(en, kur, yil)
-        preds.append(tl)
-    return np.percentile(preds, [5, 50, 95])
+@st.cache_data(show_spinner="Conformal katsayılar okunuyor...")
+def load_conformal_bounds():
+    cb_path = os.path.join(MODELS_DIR, "conformal_bounds.json")
+    if os.path.exists(cb_path):
+        try:
+            with open(cb_path, 'r') as f:
+                return json.load(f).get("q_hat_relative", 0.10)
+        except: pass
+    return 0.10 # fallback %10
+
+def conformal_ci(xgb_m, lgb_m, weights, row_dict, kur, q_hat, yil=2026):
+    """Split-Conformal kalibre edilmis guven araligi hesaplar"""
+    _, _, tl = predict_single(xgb_m, lgb_m, weights, row_dict, kur, yil)
+    return [tl * (1 - q_hat), tl, tl * (1 + q_hat)]
 
 
 def predict_2026_months(xgb_m, lgb_m, weights, df, sel_cols, kur_2026, kur_aylik_artis=0.0):
@@ -248,7 +253,10 @@ def predict_2026_months(xgb_m, lgb_m, weights, df, sel_cols, kur_2026, kur_aylik
         if 'RealUSD_Lag3' in row: row['RealUSD_Lag3'] = prev3_real_usd
 
         reel, nom, tl = predict_single(xgb_m, lgb_m, weights, row, current_kur, 2026)
-        ci = bootstrap_ci_fast(xgb_m, lgb_m, weights, row, current_kur, 2026)
+        
+        # Conformal prediction cagrisi (sabit kalibre katsayisi q_hat okunacak)
+        ci = conformal_ci(xgb_m, lgb_m, weights, row, current_kur, q_hat=load_conformal_bounds(), yil=2026)
+
 
         results.append({
             'Ay': ay, 'Ay_Ad': AYLAR_TR_FULL[ay],
@@ -322,7 +330,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # Model yükle
 try:
-    xgb_m, lgb_m, feat_cols, weights = load_models()
+    xgb_m, lgb_m, feat_cols, weights, ms_1, ms_3, ms_6 = load_models()
     df = load_history()
     perf_log = load_performance_log()
     sel_cols, _ = get_feature_cols(df)
@@ -366,6 +374,68 @@ with c5:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
+# ─── HAVA DURUMU & İKLİM RİSKİ ────────────────────────────────────────────────
+hava_path = os.path.join(BASE_DIR, "data", "processed", "hava_durumu_3aylik.json")
+if os.path.exists(hava_path):
+    with open(hava_path, 'r', encoding='utf-8') as fh:
+        hava_data = json.load(fh)
+        
+    don_v = hava_data.get("gelecek_16_gun", {}).get("don_riskli_gun_sayisi", 0)
+    st.markdown(f"""
+<div class="hero-box" style="background: linear-gradient(135deg, rgba(3, 169, 244, 0.1) 0%, rgba(0, 188, 212, 0.05) 100%); border-color: rgba(3, 169, 244, 0.3); padding: 20px 30px; margin-bottom: 20px;">
+    <p class="section-title" style="margin-top:0; color:#4dd0e1; margin-bottom: 12px;">🌤️ Karadeniz Hava Durumu & İklim Riski (3 Aylık Öngörü)</p>
+    <div style="display:flex; justify-content:space-between;">
+        <div style="flex:1;">
+            <p style="margin:0; font-size:13px; color:#aaa;">Mevsim Dönemi:</p>
+            <p style="margin:0; font-size:16px; font-weight:600; color:#fff;">{hava_data.get("mevsim_durumu", "")}</p>
+        </div>
+        <div style="flex:1;">
+            <p style="margin:0; font-size:13px; color:#aaa;">İlk 16-Gün Don Riski:</p>
+            <p style="margin:0; font-size:16px; font-weight:600; color:{'#ff6b6b' if don_v > 0 else '#6fcf97'};">{don_v} Gün Tespit Edildi</p>
+        </div>
+        <div style="flex:1.5;">
+            <p style="margin:0; font-size:13px; color:#aaa;">Gelecek 3-Ay Trend Yorumu:</p>
+            <p style="margin:0; font-size:13px; color:#ddd; padding-right:10px;">{hava_data.get("trend_3_ay", {}).get("yorum", "")}</p>
+        </div>
+    </div>
+</div>
+    """, unsafe_allow_html=True)
+
+# ─── DIRECT MULTI-STEP TAHMINLERI ─────────────────────────────────────────────
+st.markdown('<p class="section-title">⏱️ Direct Multi-Step Tahminler (Rekürsif Olmayan Uzun Vade)</p>', unsafe_allow_html=True)
+st.markdown('<div class="info-card" style="margin-bottom:20px;">'
+            'Bu bölüm doğrudan (1-Ay, 3-Ay, 6-Ay) uzaklığı hedefleyen bağımsız modellerin çıktılarıdır. '
+            'Yukarıdaki rekürsif modelde aylar ilerledikçe hata birikimi (error accumulation) oluşabilir, bu modeller ise sadece mevcut anın verilerini baz alarak "N ay sonrasını" direkt hedeflediği için uzun vadede daha sağlam fikir verebilir.</div>', unsafe_allow_html=True)
+
+_, X_all_full = get_feature_cols(df)
+last_row_df = X_all_full.iloc[[-1]]
+
+# 1 Ay (Ornegin: Nisan 2026), 3 Ay (Haziran 2026), 6 Ay (Eylul 2026)
+p_1m = np.expm1(ms_1['model'].predict(last_row_df[ms_1['features']])[0])
+p_3m = np.expm1(ms_3['model'].predict(last_row_df[ms_3['features']])[0])
+p_6m = np.expm1(ms_6['model'].predict(last_row_df[ms_6['features']])[0])
+
+# Kur hesaplari 
+# Tahmin baslangic noktamiz Nisan 2026. (t=0)
+# 1m (t+1) => Mayis, 3m (t+3) => Temmuz, 6m (t+6) => Ekim
+kur_1m = usd_try * (1 + aylik_kur_artis)**1
+kur_3m = usd_try * (1 + aylik_kur_artis)**3
+kur_6m = usd_try * (1 + aylik_kur_artis)**6
+
+_, tl_1m = reel_usd_to_tl(p_1m, kur_1m, 2026)
+_, tl_3m = reel_usd_to_tl(p_3m, kur_3m, 2026)
+_, tl_6m = reel_usd_to_tl(p_6m, kur_6m, 2026)
+
+m1, m2, m3 = st.columns(3)
+with m1:
+    st.metric("Model 1M (Mayıs '26)", f"{tl_1m:.1f} TL", help=f"Reel USD: {p_1m:.2f}$ | Gecici Kur: {kur_1m:.2f}")
+with m2:
+    st.metric("Model 3M (Temmuz '26)", f"{tl_3m:.1f} TL", help=f"Reel USD: {p_3m:.2f}$ | Gecici Kur: {kur_3m:.2f}")
+with m3:
+    st.metric("Model 6M (Ekim '26)", f"{tl_6m:.1f} TL", help=f"Reel USD: {p_6m:.2f}$ | Gecici Kur: {kur_6m:.2f}")
+
+st.markdown("<br>", unsafe_allow_html=True)
+
 # ─── ANA GRAFİK ───────────────────────────────────────────────────────────────
 st.markdown('<p class="section-title">📈 2026 Aylık Fiyat Tahmini (TL/kg)</p>', unsafe_allow_html=True)
 
@@ -388,7 +458,7 @@ if show_ci:
         y=list(pred_df['CI_High']) + list(pred_df['CI_Low'][::-1]),
         fill='toself', fillcolor='rgba(124,106,247,0.12)',
         line=dict(color='rgba(0,0,0,0)'),
-        name='%90 Guven Araligi', hoverinfo='skip',
+        name='%90 Conformal Güven Aralığı', hoverinfo='skip',
     ))
 
 fig.add_trace(go.Scatter(
@@ -700,6 +770,36 @@ with col_tmo_r:
     sc3.metric("Aralik Serbest Piyasa",
                f"{sim_df[sim_df['Ay_Num'] == 12]['Serbest'].values[0]:.0f} TL",
                delta=f"+%{sim_df[sim_df['Ay_Num']==12]['Premium'].values[0]:.0f} premium")
+
+# ─── SHAP DASHBOARD ───────────────────────────────────────────────────────────
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("---")
+st.markdown("""
+<div class="tmo-box" style="background: linear-gradient(135deg, rgba(33,150,243,0.12) 0%, rgba(3,169,244,0.06) 100%); border-color: rgba(33,150,243,0.3);">
+    <p class="tmo-title" style="background: linear-gradient(90deg, #2196F3, #03A9F4); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🧩 Model Açıklanabilirliği (SHAP)</p>
+    <p class="tmo-sub">Modelin tahmin yaparken hangi değişkenlere nasıl ağırlık verdiğini inceleyin</p>
+</div>
+""", unsafe_allow_html=True)
+
+with st.expander("Görselleri İncele (SHAP & Feature Importance)", expanded=False):
+    st.markdown('<div class="info-card" style="border-left-color: #2196F3; background: rgba(33,150,243,0.07); color: rgba(255,255,255,0.7);">SHAP (SHapley Additive exPlanations) grafiği, her bir özelliğin modelin çıktılarına kattığı etkiyi yönüyle birlikte gösterir.</div>', unsafe_allow_html=True)
+    
+    col_s1, col_s2 = st.columns(2)
+    
+    shap_path_1 = os.path.join(BASE_DIR, "reports", "figures", "08_shap_lightgbm_optuna.png")
+    shap_path_2 = os.path.join(BASE_DIR, "reports", "figures", "08_shap_lightgbm.png")
+    feat_path_1 = os.path.join(BASE_DIR, "reports", "figures", "07_feature_importance_xgboost.png")
+    
+    with col_s1:
+        st.markdown("<p style='text-align:center; color:#ccc; font-weight:600; font-size:14px;'>SHAP Özet Tablosu</p>", unsafe_allow_html=True)
+        if os.path.exists(shap_path_1): st.image(shap_path_1, use_container_width=True)
+        elif os.path.exists(shap_path_2): st.image(shap_path_2, use_container_width=True)
+        else: st.info("SHAP görseli bulunamadı.")
+            
+    with col_s2:
+        st.markdown("<p style='text-align:center; color:#ccc; font-weight:600; font-size:14px;'>XGBoost - Özellik Önemi (Feature Importance)</p>", unsafe_allow_html=True)
+        if os.path.exists(feat_path_1): st.image(feat_path_1, use_container_width=True)
+        else: st.info("Importance görseli bulunamadı.")
 
 # ─── FOOTER ───────────────────────────────────────────────────────────────────
 st.markdown("<br>", unsafe_allow_html=True)

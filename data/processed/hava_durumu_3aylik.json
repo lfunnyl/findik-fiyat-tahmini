@@ -1,0 +1,13 @@
+{
+    "tarih": "2026-03-19",
+    "mevsim_durumu": "Çiçeklenme & Don Riski Dönemi",
+    "gelecek_16_gun": {
+        "don_riskli_gun_sayisi": 0,
+        "toplam_yagis_mm": 19.3,
+        "ortalama_sicaklik": 11.7
+    },
+    "trend_3_ay": {
+        "yorum": "Open-Meteo ve tarihsel normallere göre Karadeniz (Giresun, Ordu, Trabzon) bölgesinde önümüzdeki 3 ay boyunca mevsim normallerine yakın bir eğilim beklenmektedir. Kısa vadede don riski bulunmamaktadır.",
+        "beklenen_yagis": "Normaller Civarı"
+    }
+}

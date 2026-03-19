@@ -42,7 +42,8 @@ PIPELINE_STEPS = [
             "src/data/ihracat_findik.py",
             "src/data/karadeniz_iklim_scraper.py",
             "src/data/rekolte_arz_talep.py",
-            "src/data/asgeriücret.py"
+            "src/data/asgeriücret.py",
+            "src/data/hava_durumu_tahmin.py"
         ],
         "fatal_on_fail": False  # Bir scraper hata verirse diğerleri çalışmaya devam etsin
     },
@@ -65,7 +66,9 @@ PIPELINE_STEPS = [
         "scripts": [
             "src/models/train_model.py",
             "src/models/advanced_models.py",
-            "src/models/tmo_model.py"
+            "src/models/tmo_model.py",
+            "src/models/train_multistep.py",
+            "src/models/train_conformal.py"
         ],
         "fatal_on_fail": True
     }
