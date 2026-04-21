@@ -1,0 +1,106 @@
+# ============================================================
+# Fındık Fiyat Tahmin Projesi — Merkezi Konfigürasyon
+# ============================================================
+# Bu dosya tüm scriptte tekrarlanan sabitleri tek yerden yönetir.
+# Herhangi bir parametre değiştirmek için sadece bu dosyayı düzenleyin.
+
+model:
+  top_n_features: 20        # Korelasyon/MI bazlı özellik seçimi üst sınırı
+  test_split_ratio: 0.80    # Train/Test ayrım oranı (son %20 = test)
+  n_cv_splits: 5            # Walk-Forward CV fold sayısı
+  random_seed: 42
+  feature_selection: "mutual_info"   # "correlation" veya "mutual_info"
+
+target: "Fiyat_RealUSD_kg"   # Hedef değişken (Reel USD/kg, 2024 baz)
+cpi_base_year: 2024
+
+# US CPI tablosu (enflasyon arındırma için)
+us_cpi:
+  2013: 69.04
+  2014: 70.14
+  2015: 70.25
+  2016: 71.19
+  2017: 72.67
+  2018: 74.38
+  2019: 75.71
+  2020: 76.34
+  2021: 80.30
+  2022: 88.54
+  2023: 94.17
+  2024: 100.00
+  2025: 102.80
+  2026: 105.70
+
+# Data leakage riski olan veya gereksiz sütunlar
+drop_cols:
+  - "Fiyat_RealUSD_kg"
+  - "Serbest_Piyasa_TL_kg"
+  - "Fiyat_USD_kg"
+  - "US_CPI_Carpani"
+  - "Tarih"
+  - "Yil_Ay"
+  - "Hasat_Donemi"
+  - "TMO_Giresun_TL_kg"
+  - "TMO_Levant_TL_kg"
+  - "Fiyat_Lag1"
+  - "Fiyat_Lag2"
+  - "Fiyat_Lag3"
+  - "Fiyat_Lag12"
+  - "Fiyat_Degisim_1A_Pct"
+  - "Fiyat_Degisim_3A_Pct"
+  - "Fiyat_bolu_AsgariUcret_Orani"
+  - "Yil"
+  - "Sezon_Yili"
+
+paths:
+  data: "data/processed/master_features.csv"
+  models: "models/"
+  figures: "reports/figures/"
+  performance_log: "data/performance_log.csv"
+
+# Model hiperparametreleri (varsayılan/önerilen değerler)
+xgboost:
+  n_estimators: 400
+  learning_rate: 0.05
+  max_depth: 3
+  subsample: 0.8
+  colsample_bytree: 0.7
+  min_child_weight: 5
+  reg_alpha: 0.3
+  reg_lambda: 1.0
+  early_stopping_rounds: 30
+
+lightgbm:
+  n_estimators: 400
+  learning_rate: 0.05
+  num_leaves: 20
+  min_child_samples: 15
+  subsample: 0.8
+  colsample_bytree: 0.7
+  reg_alpha: 0.3
+  reg_lambda: 1.0
+
+catboost:
+  iterations: 500
+  learning_rate: 0.05
+  depth: 4
+  l2_leaf_reg: 3.0
+
+ridge:
+  alpha: 10.0
+
+optuna:
+  n_trials: 50
+  timeout: 300   # saniye
+
+# Conformal Prediction
+conformal:
+  alpha: 0.10      # Hata payı → %90 kapsayıcılık
+  max_q_hat: 0.45  # Maksimum göreli tolerans sınırı
+
+# Dashboard
+dashboard:
+  title: "Fındık Fiyat Tahmin Sistemi"
+  version: "3.1"
+  usd_try_default: 44.0
+  aylik_kur_artis_default: 0.8

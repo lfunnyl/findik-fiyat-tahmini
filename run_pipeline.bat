@@ -1,33 +1,39 @@
 @echo off
-setlocal
+echo =======================================================
+echo FINDIK FIYATI TAHMIN SISTEMI - TAM BORU HATTI (PIPELINE)
+echo =======================================================
+echo.
 
-:: Fındık Fiyatı Tahmin Projesi - Otomatik Veri Güncelleme
-:: Bu dosya Windows Task Scheduler (Görev Zamanlayıcı) ile 
-:: her ayın belirli bir gününde (örn: her ayın 1'i ve 15'i) çalıştırılmak üzere tasarlanmıştır.
-
-echo ========================================================
-echo FINDIK FIYAT TAHMINI: OTOMATIK GUNCELLEME BASLATILIYOR...
-echo Tarih: %date% %time%
-echo ========================================================
-
-:: Scriptin bulundugu klasoru base dizin kabul et
-cd /D "%~dp0"
-
-:: Python ile pipeline scriptini calistir
-python src\data\update_pipeline.py
-
-if %ERRORLEVEL% EQU 0 (
-    echo.
-    echo ========================================================
-    echo PIPELINE BASARIYLA TAMAMLANDI! (Loglar pipeline.log dosyasinda)
-    echo ========================================================
-) else (
-    echo.
-    echo ========================================================
-    echo HATA: PIPELINE BEKLENMEYEN BIR HATA ILE SONLANDI.
-    echo Lutfen pipeline.log dosyasini kontrol edin.
-    echo ========================================================
+echo [1/4] Ortam bagimliliklari kontrol ediliyor...
+pip install -r requirements.txt --quiet
+if %errorlevel% neq 0 (
+    echo [HATA] Bagimliliklar yuklenemedi.
+    exit /b %errorlevel%
 )
 
-endlocal
+echo [2/4] Modeller Egitiliyor (XGBoost, LightGBM, CatBoost)...
+python src\models\train_model.py
+if %errorlevel% neq 0 (
+    echo [HATA] Model egitimi sirasinda hata olustu.
+    exit /b %errorlevel%
+)
+
+echo [3/4] Hata (Residual) Analizi calistiriliyor...
+python src\evaluation\residual_analysis.py
+if %errorlevel% neq 0 (
+    echo [UYARI] Hata analizi sirasinda bazi sorunlar yasandi ama devam ediliyor.
+)
+
+echo [4/4] Causal Inference (Double ML) Analizi Guncelleniyor...
+python src\evaluation\causal_inference.py
+if %errorlevel% neq 0 (
+    echo [UYARI] Causal Inference surecinde hata olustu.
+)
+
+echo.
+echo =======================================================
+echo TUM ADIMLAR TAMAMLANDI!
+echo Streamlit arayuzunu baslatmak icin:
+echo streamlit run app.py
+echo =======================================================
 pause

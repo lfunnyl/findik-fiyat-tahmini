@@ -1,0 +1,110 @@
+name: 🌰 Full CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── 1. Python Backend Testleri ──────────────────────────────────────────────
+  test-backend:
+    name: Backend Tests (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Bağımlılıkları yükle
+        run: pip install numpy pandas scikit-learn xgboost lightgbm scipy pytest pytest-cov pyyaml
+      - name: Unit testleri çalıştır
+        run: pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
+      - uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+        continue-on-error: true
+
+  # ── 2. FastAPI Lint & Import Kontrolü ──────────────────────────────────────
+  test-api:
+    name: FastAPI Lint & Schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: API bağımlılıkları yükle
+        run: pip install fastapi uvicorn pydantic pyyaml numpy pandas scikit-learn xgboost lightgbm joblib scipy
+      - name: API syntax kontrolü
+        run: python -m py_compile api/main.py && echo "✅ api/main.py syntax OK"
+      - name: Flake8 lint
+        run: |
+          pip install flake8
+          flake8 api/ src/ --max-line-length=120 --ignore=E203,W503 --count --statistics
+        continue-on-error: true
+
+  # ── 3. Next.js Build Kontrolü ──────────────────────────────────────────────
+  test-frontend:
+    name: Frontend Build (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: dashboard/package-lock.json
+      - name: Bağımlılıkları yükle
+        run: npm install
+      - name: TypeScript kontrolü
+        run: npx tsc --noEmit
+        continue-on-error: true
+      - name: Next.js build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://findik-fiyat-api.onrender.com
+
+  # ── 4. Veri Şema Doğrulaması ────────────────────────────────────────────────
+  validate-data:
+    name: Veri Yapısı Kontrolü
+    runs-on: ubuntu-latest
+    needs: test-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install numpy pandas pyyaml
+      - name: Config ve veri şema kontrolü
+        run: |
+          python -c "
+          import os, sys, yaml
+          with open('config.yaml') as f:
+              cfg = yaml.safe_load(f)
+          required_keys = ['us_cpi', 'target', 'model', 'drop_cols', 'dashboard']
+          missing = [k for k in required_keys if k not in cfg]
+          if missing:
+              print(f'❌ config.yaml eksik key: {missing}')
+              sys.exit(1)
+          print(f'✅ config.yaml OK — version: {cfg[\"dashboard\"][\"version\"]}')
+
+          data_path = 'data/processed/master_features.csv'
+          if not os.path.exists(data_path):
+              print('⚠️  Veri dosyası yok (CI ortamı) — SKIP')
+              sys.exit(0)
+          import pandas as pd
+          df = pd.read_csv(data_path, encoding='utf-8-sig')
+          required_cols = ['Tarih', 'Serbest_Piyasa_TL_kg', 'Fiyat_RealUSD_kg', 'Fiyat_USD_kg']
+          missing = [c for c in required_cols if c not in df.columns]
+          if missing:
+              print(f'❌ Eksik sütunlar: {missing}')
+              sys.exit(1)
+          print(f'✅ Veri OK: {df.shape[0]} satır × {df.shape[1]} sütun')
+          "

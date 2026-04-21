@@ -343,6 +343,41 @@ def nbeats_model(y_test_raw, dates_test, df_full):
         return None, None
 
 
+# ─── 5. Prophet Hybrid (Prophet + XGBoost) ──────────────────────────────────
+
+def prophet_hybrid_model(X_tr, X_te, y_train_raw, y_test_raw, dates_train, dates_test):
+    logger.info("\n" + "="*55)
+    logger.info("ADIM 5: Prophet Hybrid Model (Trend Ayrıştırması + XGBoost)")
+    logger.info("="*55)
+    try:
+        from prophet import Prophet
+        import logging
+        logging.getLogger('cmdstanpy').setLevel(logging.WARNING)
+        
+        train_df = pd.DataFrame({'ds': dates_train.values, 'y': y_train_raw.values})
+        m = Prophet(yearly_seasonality=True, weekly_seasonality=False, daily_seasonality=False)
+        m.fit(train_df)
+        
+        pred_train_prophet = m.predict(pd.DataFrame({'ds': dates_train.values}))['yhat'].values
+        pred_test_prophet  = m.predict(pd.DataFrame({'ds': dates_test.values}))['yhat'].values
+        
+        # XGBoost ile Hataları Tahmin Etme (Residual Learning)
+        y_residual_train = y_train_raw.values - pred_train_prophet
+        xgb_resid = xgb.XGBRegressor(n_estimators=200, learning_rate=0.05, max_depth=3, random_state=42)
+        xgb_resid.fit(X_tr, y_residual_train)
+        
+        pred_test_resid = xgb_resid.predict(X_te)
+        pred_hybrid = np.maximum(pred_test_prophet + pred_test_resid, 0) # Negatif fiyat olamaz
+        
+        sc = metrics_orig(y_test_raw, pred_hybrid, prefix="Prophet Hybrid")
+        return pred_hybrid, sc
+        
+    except Exception as e:
+        logger.warning(f"Prophet çalışamadı: {e}")
+        return None, None
+
+
+
 # ─── Karşılaştırma Grafiği ───────────────────────────────────────────────────
 
 def plot_comparison(y_test_raw, preds_dict, dates_test, all_scores):
@@ -466,6 +501,19 @@ def main():
         all_scores['N-BEATS'] = sc_nbeats
         all_preds['N-BEATS']  = pred_nbeats
 
+    # 5. Prophet Hybrid
+    split_idx = int(len(df_raw) * 0.80)
+    dates_train = df_raw['Tarih'].iloc[:split_idx]
+    y_train_raw = df_raw[TARGET].iloc[:split_idx]
+    
+    with mlflow.start_run(run_name="Prophet_Hybrid"):
+        pred_hybrid, sc_hybrid = prophet_hybrid_model(X_tr, X_te, y_train_raw, y_test_raw, dates_train, dates_test)
+        if sc_hybrid:
+            mlflow.log_metrics({"Test_R2": sc_hybrid['R2'], "Test_MAE": sc_hybrid['MAE'], 
+                                "Test_RMSE": sc_hybrid['RMSE'], "Test_MAPE": sc_hybrid['MAPE']})
+        all_scores['Prophet Hybrid'] = sc_hybrid
+        all_preds['Prophet Hybrid']  = pred_hybrid
+
     # Karşılaştırma Grafiği
     plot_comparison(y_test_raw, all_preds, dates_test, all_scores)
 
@@ -473,13 +521,17 @@ def main():
     print_summary(all_scores)
 
 
-    # En iyi modeli kaydet
+    # En iyi modeli kaydet ve tüm skorları json'a yaz (Dashboard okuyabilsin diye)
     valid = {k: v for k, v in all_scores.items() if v is not None}
     best_name = min(valid, key=lambda k: valid[k]['MAPE'])
     logger.info(f"\nEn iyi model ({best_name}) kaydediliyor → models/best_model_info.json")
     with open(os.path.join(MODELS_DIR, 'best_model_info.json'), 'w', encoding='utf-8') as f:
         json.dump({'best_model': best_name, 'scores': valid[best_name]}, f,
                   indent=2, ensure_ascii=False)
+                  
+    with open(os.path.join(MODELS_DIR, 'all_model_scores.json'), 'w', encoding='utf-8') as f:
+        json.dump(valid, f, indent=2, ensure_ascii=False)
+    logger.info("Tüm gelişmiş model skorları güncellendi → models/all_model_scores.json")
 
 
 if __name__ == "__main__":

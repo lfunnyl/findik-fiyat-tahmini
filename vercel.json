@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "installCommand": "npm install",
+  "rootDirectory": "dashboard",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://findik-fiyat-api.onrender.com"
+  }
+}

@@ -69,21 +69,25 @@ DROP_COLS = [
 # ─── Model Yükleme ────────────────────────────────────────────────────────────
 
 def load_models():
-    """Eğitilmiş XGBoost ve Ridge modellerini yükle."""
+    """Eğitilmiş XGBoost, LightGBM ve Ridge modellerini yükle."""
     xgb_bundle   = joblib.load(os.path.join(MODELS_DIR, 'xgboost_model.pkl'))
     xgb_model    = xgb_bundle['model']
     feature_cols = xgb_bundle['features']
 
-    ridge_bundle = joblib.load(os.path.join(MODELS_DIR, 'lightgbm_model.pkl'))
-    lgb_model    = ridge_bundle['model']
+    lgb_bundle   = joblib.load(os.path.join(MODELS_DIR, 'lightgbm_model.pkl'))
+    lgb_model    = lgb_bundle['model']
+
+    ridge_bundle  = joblib.load(os.path.join(MODELS_DIR, 'ridge_model.pkl'))
+    ridge_model   = ridge_bundle['model']
+    ridge_scaler  = ridge_bundle['scaler']
 
     # Ensemble ağırlıkları
     with open(os.path.join(MODELS_DIR, 'ensemble_weights.json'), 'r') as f:
         weights = json.load(f)
 
     logger.info(f"Modeller yüklendi. Özellik sayısı: {len(feature_cols)}")
-    logger.info(f"Ensemble ağırlıkları: XGBoost={weights['XGBoost']:.2f}, LightGBM={weights['LightGBM']:.2f}, Ridge={weights['Ridge']:.2f}")
-    return xgb_model, lgb_model, feature_cols, weights
+    logger.info(f"Ensemble ağırlıkları: XGBoost={weights['XGBoost']:.2f}, LightGBM={weights['LightGBM']:.4f}, Ridge={weights['Ridge']:.2f}")
+    return xgb_model, lgb_model, ridge_model, ridge_scaler, feature_cols, weights
 
 
 # ─── Veri Hazırlama ───────────────────────────────────────────────────────────
@@ -119,11 +123,12 @@ def get_selected_features(df):
     return sel, X
 
 
-def predict_reel_usd(xgb_model, lgb_model, weights, row_features):
+def predict_reel_usd(xgb_model, lgb_model, ridge_model, ridge_scaler, weights, row_features):
     """
     Tek bir satır (1 aylık veri) için reel USD tahmini yapar.
+    Weighted Ensemble: XGBoost + LightGBM + Ridge (ayrı scaler ile).
 
-    Dönüş: {'reel_usd': float, 'xgb_pred': float, 'lgb_pred': float}
+    Dönüş: {'reel_usd': float, 'xgb_pred': float, 'lgb_pred': float, 'ridge_pred': float}
     """
     X_arr = pd.DataFrame([row_features])
     pred_xgb_log = xgb_model.predict(X_arr)[0]
@@ -132,12 +137,24 @@ def predict_reel_usd(xgb_model, lgb_model, weights, row_features):
     pred_xgb = np.expm1(pred_xgb_log)
     pred_lgb = np.expm1(pred_lgb_log)
 
-    # Weighted ensemble (Ridge ağırlığı için XGBoost kullanıyoruz - Ridge'in scaler'ı yok burada)
-    ensemble = weights['XGBoost'] * pred_xgb + weights['LightGBM'] * pred_lgb + weights['Ridge'] * pred_xgb
+    # Ridge — kendi scaler'ıyla
+    try:
+        X_ridge = ridge_scaler.transform(X_arr)
+        pred_ridge = np.expm1(ridge_model.predict(X_ridge)[0])
+    except Exception:
+        pred_ridge = pred_xgb  # fallback: scaler uyumsuzluğunda XGBoost kullan
+
+    # Weighted ensemble — her model kendi ağırlığıyla
+    ensemble = (
+        weights['XGBoost']  * pred_xgb +
+        weights['LightGBM'] * pred_lgb +
+        weights['Ridge']    * pred_ridge
+    )
     return {
-        'reel_usd':  ensemble,
-        'xgb_pred':  pred_xgb,
-        'lgb_pred':  pred_lgb,
+        'reel_usd':   ensemble,
+        'xgb_pred':   pred_xgb,
+        'lgb_pred':   pred_lgb,
+        'ridge_pred': pred_ridge,
     }
 
 
@@ -157,7 +174,7 @@ def reel_usd_to_tl(reel_usd, usd_try_kur, tahmin_yili=2026):
 
 # ─── Bootstrap Güven Aralığı ─────────────────────────────────────────────────
 
-def bootstrap_ci(xgb_model, lgb_model, weights, row_features, n_bootstrap=500, noise_pct=0.03):
+def bootstrap_ci(xgb_model, lgb_model, ridge_model, ridge_scaler, weights, row_features, n_bootstrap=500, noise_pct=0.03):
     """
     Basit parametrik bootstrap ile %90 güven aralığı.
     row_features'a küçük rastgele gürültü ekleyerek tahmin dağılımı oluşturur.
@@ -170,11 +187,14 @@ def bootstrap_ci(xgb_model, lgb_model, weights, row_features, n_bootstrap=500, n
     for _ in range(n_bootstrap):
         noisy = base * (1 + rng.normal(0, noise_pct, base.shape))
         X_noisy = pd.DataFrame(noisy, columns=list(row_features.keys()))
-        res = predict_reel_usd(xgb_model, lgb_model, weights, row_features)
-        # Noisy tahmin için doğrudan hesapla
         p_xgb = np.expm1(xgb_model.predict(X_noisy)[0])
         p_lgb = np.expm1(lgb_model.predict(X_noisy)[0])
-        p_ens = weights['XGBoost'] * p_xgb + weights['LightGBM'] * p_lgb + weights['Ridge'] * p_xgb
+        try:
+            X_ridge = ridge_scaler.transform(X_noisy)
+            p_ridge = np.expm1(ridge_model.predict(X_ridge)[0])
+        except Exception:
+            p_ridge = p_xgb
+        p_ens = weights['XGBoost'] * p_xgb + weights['LightGBM'] * p_lgb + weights['Ridge'] * p_ridge
         predictions.append(p_ens)
 
     return np.percentile(predictions, [5, 50, 95])
@@ -290,7 +310,7 @@ def predict_next_month(interactive=True):
     """
     df              = load_history()
     sel_cols, X_all = get_selected_features(df)
-    xgb_model, lgb_model, feature_cols, weights = load_models()
+    xgb_model, lgb_model, ridge_model, ridge_scaler, feature_cols, weights = load_models()
 
     # Son gözlemi al
     last_row   = df.iloc[-1]
@@ -341,13 +361,13 @@ def predict_next_month(interactive=True):
 
     # ── Tahmin ──
     logger.info(f"\n{'─'*55}")
-    result       = predict_reel_usd(xgb_model, lgb_model, weights, row_features)
+    result       = predict_reel_usd(xgb_model, lgb_model, ridge_model, ridge_scaler, weights, row_features)
     reel_usd     = result['reel_usd']
     tahmin_yili  = next_month.year
     nom_usd, tl  = reel_usd_to_tl(reel_usd, usd_try_kur, tahmin_yili)
 
     # Bootstrap güven aralığı
-    ci           = bootstrap_ci(xgb_model, lgb_model, weights, row_features)
+    ci           = bootstrap_ci(xgb_model, lgb_model, ridge_model, ridge_scaler, weights, row_features)
     ci_tl_low    = reel_usd_to_tl(ci[0], usd_try_kur, tahmin_yili)[1]
     ci_tl_high   = reel_usd_to_tl(ci[2], usd_try_kur, tahmin_yili)[1]
     _, ci_tl_med = reel_usd_to_tl(ci[1], usd_try_kur, tahmin_yili)
@@ -369,10 +389,10 @@ def predict_next_month(interactive=True):
     if interactive:
         sor = input("\n📊 Senaryo analizi yapılsın mı? [E/h]: ").strip().lower()
         if sor != 'h':
-            scenario_analysis(xgb_model, lgb_model, weights, row_features,
+            scenario_analysis(xgb_model, lgb_model, ridge_model, ridge_scaler, weights, row_features,
                               sel_cols, usd_try_kur, tahmin_yili)
     else:
-        scenario_analysis(xgb_model, lgb_model, weights, row_features,
+        scenario_analysis(xgb_model, lgb_model, ridge_model, ridge_scaler, weights, row_features,
                           sel_cols, usd_try_kur, tahmin_yili)
 
     return {

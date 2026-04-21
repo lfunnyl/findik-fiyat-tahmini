@@ -1,0 +1,27 @@
+{
+  "n_test_samples": 31,
+  "metrics": {
+    "MAE": 0.5304,
+    "RMSE": 0.7967,
+    "R2": 0.4606,
+    "MAPE": 10.23
+  },
+  "residual_stats": {
+    "mean": 0.2467,
+    "std": 0.7575,
+    "min": -0.5712,
+    "max": 2.7489,
+    "skewness": 1.4974,
+    "kurtosis": 1.8321
+  },
+  "diagnostics": {
+    "durbin_watson": 0.5042,
+    "normality_test_pvalue": 0.0005,
+    "is_autocorrelated": true,
+    "is_normal": false
+  },
+  "seasonal_breakdown": {
+    "mape_hasat_season_pct": 12.98,
+    "mape_non_hasat_pct": 9.28
+  }
+}

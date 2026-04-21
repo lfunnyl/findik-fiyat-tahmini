@@ -31,3 +31,21 @@ vendor/
 coverage/
 .cache/
 tmp/
+
+# ── ML Artifact'lar (büyük dosyalar, Git LFS veya HuggingFace Hub kullan) ──
+mlflow.db
+mlruns/
+lightning_logs/
+# Model dosyaları — eğitilmiş pkl'ler repo'da bulunmamalı.
+# Kullanmak için: python src/models/train_model.py && python src/models/advanced_models.py
+# NOT: Geçici olarak tracking için models/ takip edilebilir, ama üretimde HF Hub önerilir.
+# models/*.pkl
+
+# ── Pytest / Coverage ──
+.pytest_cache/
+htmlcov/
+coverage.xml
+*.coverage
+
+# ── Jupyter ──
+.ipynb_checkpoints/

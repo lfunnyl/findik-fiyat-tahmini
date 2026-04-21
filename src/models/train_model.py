@@ -5,15 +5,16 @@ Fındık Fiyatı Tahmin Projesi - Model Eğitim Scripti
 
 Teknik Not (Temporal Covariate Shift Çözümü):
   - Hedef değişken LOG dönüşümü ile normalize edilir (enflasyonist trend baskılanır)
-  - Feature selection: Korelasyon bazlı Top-30 özellik seçimi (overfitting azaltılır)
+  - Feature selection: Mutual Information bazlı Top-20 özellik seçimi (doğrusal olmayan ilişkiler)
   - Walk-Forward CV: Her fold'da sadece geçmiş veri kullanılır (data leakage yok)
   - Expanding Window: Model her fold'da birikimli geçmiş ile eğitilir
 
-Strateji (4 Adım):
+Strateji (5 Adım):
   1. Baseline     : Ridge Regression (referans skor)
   2. Ana Model    : XGBoost (Walk-Forward Expanding Window CV)
   3. Gelişmiş     : LightGBM + SHAP Açıklanabilirlik
-  4. Optimizasyon : Optuna Hyperparametre Arama
+  4. CatBoost     : Kategorik uyumlu gradient boosting
+  5. Optimizasyon : Optuna Hyperparametre Arama
 
 Çıktı:
   - models/ klasörüne .pkl model dosyaları
@@ -38,9 +39,16 @@ from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
+from sklearn.feature_selection import mutual_info_regression
 
 import xgboost as xgb
 import lightgbm as lgb
+try:
+    from catboost import CatBoostRegressor
+    CATBOOST_AVAILABLE = True
+except ImportError:
+    CATBOOST_AVAILABLE = False
+    logging.warning("CatBoost kurulu değil: pip install catboost")
 import shap
 import optuna
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -78,7 +86,8 @@ DROP_COLS = [
     'Yil', 'Sezon_Yili',
 ]
 
-TOP_N_FEATURES = 20  # Korelasyon bazı feature selection
+TOP_N_FEATURES = 20  # Feature selection üst sınırı
+FEATURE_METHOD = 'mutual_info'  # 'correlation' veya 'mutual_info'
 
 
 
@@ -120,14 +129,22 @@ def prepare_xy(df):
     return X_raw, y_log, y_raw
 
 
-def select_features(X_train, y_train, top_n=TOP_N_FEATURES):
+def select_features(X_train, y_train, top_n=TOP_N_FEATURES, method=FEATURE_METHOD):
     """
-    Train seti üzerinde korelasyon bazlı feature selection.
+    Train seti üzerinde feature selection.
+    method='mutual_info' → Mutual Information (doğrusal olmayan ilişkileri yakalar)
+    method='correlation' → Pearson korelasyonu (hızlı, doğrusal)
     Yalnızca train verisini kullanarak seçim yapılır (test sızıntısı yok).
     """
-    corr = X_train.corrwith(y_train).abs().dropna()
-    selected = corr.nlargest(top_n).index.tolist()
-    logger.info(f"  Feature Selection: {len(X_train.columns)} → {len(selected)} özellik")
+    if method == 'mutual_info':
+        mi_scores = mutual_info_regression(X_train, y_train, random_state=42, n_neighbors=5)
+        mi_series = pd.Series(mi_scores, index=X_train.columns).dropna()
+        selected  = mi_series.nlargest(top_n).index.tolist()
+        logger.info(f"  Feature Selection (MI): {len(X_train.columns)} → {len(selected)} özellik")
+    else:
+        corr = X_train.corrwith(y_train).abs().dropna()
+        selected = corr.nlargest(top_n).index.tolist()
+        logger.info(f"  Feature Selection (Corr): {len(X_train.columns)} → {len(selected)} özellik")
     logger.info(f"  Top 10: {selected[:10]}")
     return selected
 
@@ -337,6 +354,43 @@ def train_lightgbm(X, y_log, X_train, X_test, y_train_log, y_test_raw):
     return lgb_model, sel_cols, scores['y_pred_orig'], scores
 
 
+# ─── ADIM 4: CatBoost ────────────────────────────────────────────────────
+
+def train_catboost(X, y_log, X_train, X_test, y_train_log, y_test_raw):
+    if not CATBOOST_AVAILABLE:
+        logger.warning("CatBoost kurulu değil, atlanıyor. pip install catboost")
+        return None, None, None, None
+
+    logger.info("\n" + "="*60)
+    logger.info("ADIM 4: CatBoost (Gradient Boosting)")
+    logger.info("="*60)
+
+    def cat_factory():
+        return CatBoostRegressor(
+            iterations=500, learning_rate=0.05, depth=4,
+            l2_leaf_reg=3.0, random_seed=42, verbose=0,
+            loss_function='RMSE'
+        )
+
+    walk_forward_expanding_cv(cat_factory, X, y_log, n_splits=5, model_name="CatBoost")
+
+    sel_cols = select_features(X_train, y_train_log)
+    X_tr_sel, X_te_sel = X_train[sel_cols], X_test[sel_cols]
+
+    cat_model = CatBoostRegressor(
+        iterations=500, learning_rate=0.05, depth=4,
+        l2_leaf_reg=3.0, random_seed=42, verbose=0,
+        loss_function='RMSE'
+    )
+    cat_model.fit(X_tr_sel, y_train_log, eval_set=(X_te_sel, np.log1p(y_test_raw)),
+                  early_stopping_rounds=30)
+    preds_log = cat_model.predict(X_te_sel)
+    scores = metrics_log(np.log1p(y_test_raw), preds_log, prefix="CatBoost (Test)")
+    joblib.dump({'model': cat_model, 'features': sel_cols}, os.path.join(MODELS_DIR, 'catboost_model.pkl'))
+    plot_feature_importance(cat_model, sel_cols, "CatBoost")
+    return cat_model, sel_cols, scores['y_pred_orig'], scores
+
+
 # ─── ADIM 4: Optuna ─────────────────────────────────────────────────────────
 
 def optuna_optimize(X_train, X_test, y_train_log, y_test_raw, sel_cols, n_trials=50):
@@ -447,15 +501,14 @@ def main():
     y_test_raw  = y_raw.iloc[split_idx:]
     dates_test  = df['Tarih'].iloc[split_idx:]
 
-    logger.info(
-        f"Train: {len(X_train)} ay "
+    logger.info(f"Train: {len(X_train)} ay "
         f"({df['Tarih'].iloc[0].strftime('%Y-%m')} → {df['Tarih'].iloc[split_idx-1].strftime('%Y-%m')})"
     )
     logger.info(
         f"Test : {len(X_test)} ay "
         f"({dates_test.iloc[0].strftime('%Y-%m')} → {dates_test.iloc[-1].strftime('%Y-%m')})"
     )
-    logger.info(f"Toplam Feature: {X_train.shape[1]} → Korelasyon ile Top-{TOP_N_FEATURES} seçilecek")
+    logger.info(f"Toplam Feature: {X_train.shape[1]} → {FEATURE_METHOD.upper()} ile Top-{TOP_N_FEATURES} seçilecek")
 
     all_scores = {}
     all_preds  = {}
@@ -467,7 +520,7 @@ def main():
     # 1. Baseline
     with mlflow.start_run(run_name="Ridge_Baseline"):
         preds_ridge, sc_ridge = train_baseline(X_train, X_test, y_train_log, y_test_raw)
-        mlflow.log_metrics({"Test_R2": sc_ridge['R2'], "Test_MAE": sc_ridge['MAE'], 
+        mlflow.log_metrics({"Test_R2": sc_ridge['R2'], "Test_MAE": sc_ridge['MAE'],
                             "Test_RMSE": sc_ridge['RMSE'], "Test_MAPE": sc_ridge['MAPE']})
         all_scores['Ridge Baseline'] = sc_ridge
         all_preds['Ridge Baseline']  = preds_ridge
@@ -477,7 +530,7 @@ def main():
         xgb_model, xgb_cols, preds_xgb, sc_xgb = train_xgboost(
             X, y_log, X_train, X_test, y_train_log, y_test_raw
         )
-        mlflow.log_metrics({"Test_R2": sc_xgb['R2'], "Test_MAE": sc_xgb['MAE'], 
+        mlflow.log_metrics({"Test_R2": sc_xgb['R2'], "Test_MAE": sc_xgb['MAE'],
                             "Test_RMSE": sc_xgb['RMSE'], "Test_MAPE": sc_xgb['MAPE']})
         all_scores['XGBoost'] = sc_xgb
         all_preds['XGBoost']  = preds_xgb
@@ -487,31 +540,50 @@ def main():
         lgb_model, lgb_cols, preds_lgb, sc_lgb = train_lightgbm(
             X, y_log, X_train, X_test, y_train_log, y_test_raw
         )
-        mlflow.log_metrics({"Test_R2": sc_lgb['R2'], "Test_MAE": sc_lgb['MAE'], 
+        mlflow.log_metrics({"Test_R2": sc_lgb['R2'], "Test_MAE": sc_lgb['MAE'],
                             "Test_RMSE": sc_lgb['RMSE'], "Test_MAPE": sc_lgb['MAPE']})
         all_scores['LightGBM'] = sc_lgb
         all_preds['LightGBM']  = preds_lgb
 
-    # 4. Optuna
+    # 4. CatBoost
+    with mlflow.start_run(run_name="CatBoost_Default"):
+        cat_model, cat_cols, preds_cat, sc_cat = train_catboost(
+            X, y_log, X_train, X_test, y_train_log, y_test_raw
+        )
+        if sc_cat:
+            mlflow.log_metrics({"Test_R2": sc_cat['R2'], "Test_MAE": sc_cat['MAE'],
+                                "Test_RMSE": sc_cat['RMSE'], "Test_MAPE": sc_cat['MAPE']})
+            all_scores['CatBoost'] = sc_cat
+            all_preds['CatBoost']  = preds_cat
+
+    # 5. Optuna
     with mlflow.start_run(run_name="Optuna_Best_Models"):
         preds_xgb_o, sc_xgb_o, preds_lgb_o, sc_lgb_o = optuna_optimize(
             X_train, X_test, y_train_log, y_test_raw, xgb_cols, n_trials=50
         )
-        # Sadece XGBoost Optuna'nin sonuclarini bu run'a yazalim
-        mlflow.log_metrics({"Test_R2_XGB_Optuna": sc_xgb_o['R2'], "Test_MAE_XGB_Optuna": sc_xgb_o['MAE'], 
+        mlflow.log_metrics({"Test_R2_XGB_Optuna": sc_xgb_o['R2'], "Test_MAE_XGB_Optuna": sc_xgb_o['MAE'],
                             "Test_MAPE_XGB_Optuna": sc_xgb_o['MAPE']})
-        
         all_scores['XGBoost (Optuna)']  = sc_xgb_o
         all_scores['LightGBM (Optuna)'] = sc_lgb_o
         all_preds['XGBoost (Optuna)']   = preds_xgb_o
         all_preds['LightGBM (Optuna)']  = preds_lgb_o
 
     # Tahmin Grafiği
-
     plot_predictions(y_test_raw, all_preds, dates_test)
 
     # Özet
     print_summary(all_scores)
+
+    # Tüm sonuçları JSON olarak kaydet (Dashboard için)
+    import json
+    scores_serializable = {
+        k: {m: float(v) for m, v in sc.items() if m != 'y_pred_orig'}
+        for k, sc in all_scores.items()
+    }
+    json_path = os.path.join(MODELS_DIR, 'all_model_scores.json')
+    with open(json_path, 'w', encoding='utf-8') as jf:
+        json.dump(scores_serializable, jf, indent=2, ensure_ascii=False)
+    logger.info(f"Tüm model skorları kaydedildi → {json_path}")
 
 
 if __name__ == "__main__":
