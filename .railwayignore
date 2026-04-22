@@ -1,0 +1,16 @@
+# Railway Build Ignore
+dashboard/
+node_modules/
+.git/
+.venv/
+mlruns/
+catboost_info/
+lightning_logs/
+notebooks/
+docs/
+tests/
+reports/
+data/raw/
+*.log
+*.pkl.bak
+.pytest_cache/
