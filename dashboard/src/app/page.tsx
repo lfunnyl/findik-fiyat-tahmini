@@ -288,7 +288,7 @@ export default function Home() {
                   }]}
                   layout={{
                     ...DARK, height: 400, margin: { l: 160, r: 40, t: 10, b: 40 },
-                    xaxis: { gridcolor: 'rgba(255,255,255,0.06)', zeroline: false, title: 'Önem Skoru' },
+                    xaxis: { gridcolor: 'rgba(255,255,255,0.06)', zeroline: false, title: { text: 'Önem Skoru' } },
                     yaxis: { gridcolor: 'rgba(255,255,255,0.06)', zeroline: false },
                   }}
                   config={{ displayModeBar: false, responsive: true }}
