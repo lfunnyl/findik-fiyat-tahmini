@@ -63,28 +63,30 @@ def build_tmo_dataset():
     ag['TMO_Lag1']         = ag['TMO_Giresun_TL_kg'].shift(1)
     ag['TMO_Buyume_Pct']   = ag['TMO_Giresun_TL_kg'].pct_change() * 100
 
-    # Özellik sütunları — config.yaml ile senkron (tmo_model.features)
+    # Nominal TL değerlerini Dolara çevir (Enflasyon gürültüsünü silmek için)
+    ag['Asgari_Ucret_USD'] = ag['Asgari_Ucret_TL'] / ag['USD_TRY_Kapanis']
+    ag['TMO_Lag1_USD'] = ag['TMO_Lag1'] / ag['USD_TRY_Kapanis']
+    ag['Serbest_Piyasa_USD'] = ag['Serbest_Piyasa_TL_kg'] / ag['USD_TRY_Kapanis']
+
+    # Özellik sütunları — config.yaml bağımsız, doğrudan USD bazlı mantık
     feature_cols_all = [
-        'USD_TRY_Kapanis',       # Döviz kuru → maliyet baskısı (ŞART)
-        'Asgari_Ucret_TL',       # İşçilik maliyeti → devlet referansı (ŞART)
-        'TUFE_Yillik_Pct',       # Yıllık enflasyon → satın alma gücü (ŞART)
-        'Uretim_Ton_Turkiye',    # Türkiye rekoltesi → arz (ŞART)
-        'Dunya_Tuketim_Ton',     # Dünya talebi
-        'TMO_Lag1',              # Geçen yılın taban → referans (ŞART)
-        'Serbest_Piyasa_TL_kg',  # Piyasa sinyali (Temmuz) — strict leakage değil
-        # Arz tarafı güçlendirme (SHAP analizinden eklendi):
-        'Azerbaycan_Uretim_Ton', # Rakip ülke üretimi — arz baskısı
-        'Uretim_Ton_Dunyaa',     # Dünya toplam arzı
+        'USD_TRY_Kapanis',       # Döviz kuru → trend
+        'Asgari_Ucret_USD',      # İşçilik maliyeti (Dolar bazında)
+        'TUFE_Yillik_Pct',       # Yıllık enflasyon 
+        'Uretim_Ton_Turkiye',    # Türkiye rekoltesi → arz
+        'TMO_Lag1_USD',          # Geçen yılın taban fiyatı (Dolar bazında)
+        'Serbest_Piyasa_USD',    # Piyasa sinyali (Dolar bazında)
+        'Azerbaycan_Uretim_Ton', # Rakip ülke üretimi
     ]
 
     # Eksik kolonları sessizce atla (drop_if_missing listesi)
-    optional_cols = {'Azerbaycan_Uretim_Ton', 'Uretim_Ton_Dunyaa', 'Dunya_Tuketim_Ton'}
+    optional_cols = {'Azerbaycan_Uretim_Ton'}
     avail = [
         c for c in feature_cols_all
         if c in ag.columns and (c not in optional_cols or ag[c].notna().sum() > 5)
     ]
     tmo_df = ag[['Yil', 'Tarih', 'TMO_Giresun_TL_kg', 'TMO_Buyume_Pct'] + avail].dropna(
-        subset=['TMO_Giresun_TL_kg', 'TMO_Lag1']
+        subset=['TMO_Giresun_TL_kg', 'TMO_Lag1_USD']
     )
 
     logger.info(f"TMO dataset: {len(tmo_df)} yil (2013-2025), {len(avail)} ozellik")
@@ -99,7 +101,8 @@ def train_tmo_model(tmo_df, feature_cols):
     Küçük örneklem (13 gözlem) için en uygun CV stratejisi.
     """
     X = tmo_df[feature_cols].values
-    y = np.log(tmo_df['TMO_Giresun_TL_kg'].values)   # Log-transform
+    # TMO'nun fiyatını Dolara bölüp öyle modelleyeceğiz (Enflasyon/kur gürültüsünü engeller)
+    y = np.log(tmo_df['TMO_Giresun_TL_kg'].values / tmo_df['USD_TRY_Kapanis'].values)
 
     scaler = StandardScaler()
     X_s    = scaler.fit_transform(X)
@@ -119,8 +122,9 @@ def train_tmo_model(tmo_df, feature_cols):
         m.fit(X_s[tr_idx], y[tr_idx])
         oof[val_idx] = m.predict(X_s[val_idx])
 
-    oof_orig = np.exp(oof)
-    y_orig   = np.exp(y)
+    # Tahminleri (USD) tekrar TL'ye çevir: Dolar tahmini * O yılın Dolar Kuru
+    oof_orig = np.exp(oof) * tmo_df['USD_TRY_Kapanis'].values
+    y_orig   = tmo_df['TMO_Giresun_TL_kg'].values
     mape_loo = np.mean(np.abs((y_orig - oof_orig) / y_orig)) * 100
     mae_loo  = mean_absolute_error(y_orig, oof_orig)
     r2_loo   = r2_score(y_orig, oof_orig)
@@ -169,9 +173,10 @@ def predict_tmo_2026(model, scaler, feature_cols, tmo_df, override_values=None):
 
     defaults = {}
     for col in feature_cols:
-        if col == 'TMO_Lag1':
-            # 2026 modeline girerken, 2025'te aciklanan TMO = gececek yilin TMO'su 200 TL
-            defaults[col] = float(last['TMO_Giresun_TL_kg'])
+        if col == 'TMO_Lag1_USD':
+            # 2026'ya girerken Lag1 (Geçen yılki) 2025 TMO fiyatıdır. Onu 2026 kur tahminimize bölüyoruz.
+            expected_usd_try = float(last['USD_TRY_Kapanis']) * growth('USD_TRY_Kapanis')
+            defaults[col] = float(last['TMO_Giresun_TL_kg']) / expected_usd_try
         elif col == 'Uretim_Ton_Turkiye':
             # Uretim miktari gorece stabil; 5 yil ortalamasi
             defaults[col] = float(tmo_df[col].tail(5).mean())
@@ -190,10 +195,16 @@ def predict_tmo_2026(model, scaler, feature_cols, tmo_df, override_values=None):
 
     X_input    = pd.DataFrame([defaults])[feature_cols].values
     X_scaled   = scaler.transform(X_input)
-    y_pred_log = model.predict(X_scaled)[0]
-    tmo_pred   = np.exp(y_pred_log)
+    y_pred_usd_log = model.predict(X_scaled)[0]
+    
+    # 1. Adım: Dolar bazında tahmini hesapla
+    tmo_pred_usd = np.exp(y_pred_usd_log)
+    
+    # 2. Adım: Kur ile çarparak TL karşılığını bul
+    tmo_pred_tl = tmo_pred_usd * defaults['USD_TRY_Kapanis']
 
-    return tmo_pred, defaults
+    logger.info(f"  USD Tahmini  : {tmo_pred_usd:.2f} USD/kg")
+    return tmo_pred_tl, defaults
 
 
 def bootstrap_tmo_ci(model, scaler, feature_cols, input_dict, n=500, noise_pct=0.05):
@@ -204,8 +215,13 @@ def bootstrap_tmo_ci(model, scaler, feature_cols, input_dict, n=500, noise_pct=0
     for _ in range(n):
         noisy = base * (1 + rng.normal(0, noise_pct, base.shape))
         noisy = np.clip(noisy, 0, None)
-        y_pred = np.exp(model.predict(scaler.transform(noisy))[0])
-        preds.append(y_pred)
+        # 1. Dolar bazında tahmin
+        y_pred_usd = np.exp(model.predict(scaler.transform(noisy))[0])
+        # 2. Gürültülü kur üzerinden TL'ye çevir (Input dict içindeki kur değerini bul)
+        # Not: USD_TRY_Kapanis'in indexini feature_cols içinden bulmalıyız
+        usd_idx = feature_cols.index('USD_TRY_Kapanis')
+        y_pred_tl  = y_pred_usd * noisy[0, usd_idx]
+        preds.append(y_pred_tl)
     return np.percentile(preds, [5, 25, 50, 75, 95])
 
 
@@ -286,8 +302,8 @@ def main():
 
         logger.info("\n2026 TMO Tahmini:")
 
-    pred_2026, input_vals = predict_tmo_2026(model, scaler, feature_cols, tmo_df)
-    ci = bootstrap_tmo_ci(model, scaler, feature_cols, input_vals)
+        pred_2026, input_vals = predict_tmo_2026(model, scaler, feature_cols, tmo_df)
+        ci = bootstrap_tmo_ci(model, scaler, feature_cols, input_vals)
 
     logger.info(f"  Nokta Tahmin : {pred_2026:.1f} TL/kg")
     logger.info(f"  %90 CI       : [{ci[0]:.1f} — {ci[4]:.1f}] TL/kg")

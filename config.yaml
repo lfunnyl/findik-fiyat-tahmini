@@ -144,13 +144,9 @@ tmo_model:
     - "Asgari_Ucret_TL"           # İşçilik maliyeti — devlet referansı (ŞART)
     - "TUFE_Yillik_Pct"           # Yıllık enflasyon (ŞART)
     - "Uretim_Ton_Turkiye"        # Türkiye rekoltesi — arz (ŞART)
-    - "Dunya_Tuketim_Ton"         # Dünya talebi
     - "TMO_Lag1"                  # Geçen yılın taban fiyatı — referans (ŞART)
     - "Serbest_Piyasa_TL_kg"      # Temmuz piyasa sinyali (strict leakage değil)
     # Eklendi — Arz tarafı güçlendirme:
     - "Azerbaycan_Uretim_Ton"     # Rakip ülke üretimi (SHAP #5 ana modelde)
-    - "Uretim_Ton_Dunyaa"         # Dünya toplam arzı
   drop_if_missing:               # Bu kolonlar eksikse sessizce atla
     - "Azerbaycan_Uretim_Ton"
-    - "Uretim_Ton_Dunyaa"
-    - "Dunya_Tuketim_Ton"
