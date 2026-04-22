@@ -1,19 +1,15 @@
 # ============================================================
-# requirements-api.txt
-# ============================================================
-# FastAPI backend (api/main.py) için bağımlılıklar.
-# Render / Railway deployment'ında bu dosyayı kullan.
+# requirements-api.txt (OPTIMIZED)
 # ============================================================
 
 # Web framework
 fastapi>=0.111.0
-uvicorn[standard]>=0.29.0
-python-multipart>=0.0.9
+uvicorn>=0.29.0
 
 # Veri doğrulama
 pydantic>=2.7.0
 
-# ML modelleri (sadece inference)
+# ML modelleri (Inference only)
 scikit-learn>=1.4.0
 xgboost>=2.0.0
 lightgbm>=4.3.0
@@ -23,11 +19,5 @@ joblib>=1.3.0
 pandas>=2.0.0
 numpy>=1.26.0
 
-# İstatistik
-scipy>=1.12.0
-
 # Konfig
 pyyaml>=6.0.1
-
-# HTTP
-requests>=2.31.0
