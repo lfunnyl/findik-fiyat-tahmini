@@ -63,18 +63,26 @@ def build_tmo_dataset():
     ag['TMO_Lag1']         = ag['TMO_Giresun_TL_kg'].shift(1)
     ag['TMO_Buyume_Pct']   = ag['TMO_Giresun_TL_kg'].pct_change() * 100
 
-    # Özellik sütunları
-    feature_cols = [
-        'USD_TRY_Kapanis',       # Döviz kuru → maliyet baskısı
-        'Asgari_Ucret_TL',       # İşçilik maliyeti → devlet referansı
-        'TUFE_Yillik_Pct',       # Yıllık enflasyon → satın alma gücü
-        'Uretim_Ton_Turkiye',    # Türkiye rekoltesi → arz
+    # Özellik sütunları — config.yaml ile senkron (tmo_model.features)
+    feature_cols_all = [
+        'USD_TRY_Kapanis',       # Döviz kuru → maliyet baskısı (ŞART)
+        'Asgari_Ucret_TL',       # İşçilik maliyeti → devlet referansı (ŞART)
+        'TUFE_Yillik_Pct',       # Yıllık enflasyon → satın alma gücü (ŞART)
+        'Uretim_Ton_Turkiye',    # Türkiye rekoltesi → arz (ŞART)
         'Dunya_Tuketim_Ton',     # Dünya talebi
-        'TMO_Lag1',              # Geçen yılın taban → referans
-        'Serbest_Piyasa_TL_kg',  # Piyasa sinyali (Temmuz)
+        'TMO_Lag1',              # Geçen yılın taban → referans (ŞART)
+        'Serbest_Piyasa_TL_kg',  # Piyasa sinyali (Temmuz) — strict leakage değil
+        # Arz tarafı güçlendirme (SHAP analizinden eklendi):
+        'Azerbaycan_Uretim_Ton', # Rakip ülke üretimi — arz baskısı
+        'Uretim_Ton_Dunyaa',     # Dünya toplam arzı
     ]
 
-    avail = [c for c in feature_cols if c in ag.columns]
+    # Eksik kolonları sessizce atla (drop_if_missing listesi)
+    optional_cols = {'Azerbaycan_Uretim_Ton', 'Uretim_Ton_Dunyaa', 'Dunya_Tuketim_Ton'}
+    avail = [
+        c for c in feature_cols_all
+        if c in ag.columns and (c not in optional_cols or ag[c].notna().sum() > 5)
+    ]
     tmo_df = ag[['Yil', 'Tarih', 'TMO_Giresun_TL_kg', 'TMO_Buyume_Pct'] + avail].dropna(
         subset=['TMO_Giresun_TL_kg', 'TMO_Lag1']
     )

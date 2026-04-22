@@ -5,11 +5,11 @@
 # Herhangi bir parametre değiştirmek için sadece bu dosyayı düzenleyin.
 
 model:
-  top_n_features: 20        # Korelasyon/MI bazlı özellik seçimi üst sınırı
+  top_n_features: 15        # Korelasyon/MI bazlı özellik seçimi üst sınırı (20'den 15'e indirildi — multikolinearite azaltma)
   test_split_ratio: 0.80    # Train/Test ayrım oranı (son %20 = test)
   n_cv_splits: 5            # Walk-Forward CV fold sayısı
   random_seed: 42
-  feature_selection: "mutual_info"   # "correlation" veya "mutual_info"
+  feature_selection: "vif"  # "correlation", "mutual_info" veya "vif" (Variance Inflation Factor)
 
 target: "Fiyat_RealUSD_kg"   # Hedef değişken (Reel USD/kg, 2024 baz)
 cpi_base_year: 2024
@@ -51,6 +51,36 @@ drop_cols:
   - "Fiyat_bolu_AsgariUcret_Orani"
   - "Yil"
   - "Sezon_Yili"
+  # --- SHAP Skoru Sıfır: Modele Katkısı Yok ---
+  - "Altin_Ons_Kapanis"     # SHAP=0.0004 — anlamsız sinyal
+  - "Ihracat_Deger_mUSD"    # SHAP=0.0000 — sıfır etki
+  - "TCMB_Faiz_Orani"       # SHAP=0.0000 — sıfır etki
+  # --- Multikolinearite: Lag Redundansı ---
+  - "USD_Lag2"              # Lag1 ve Lag3 zaten mevcut; Lag2 gereksiz
+
+# Multikolinearite Yönetimi
+multicollinearity:
+  vif_threshold: 10.0       # Bu VIF değerinin üzerindeki featurelar otomatik çıkarılır
+  max_lag_features: 3       # Aynı değişken için max lag sayısı (Lag1, Lag3, Lag12)
+  # Öncelikli tutulacak lag'lar (bunlar drop edilmez)
+  keep_lags:
+    - "RealUSD_Lag1"         # En güçlü sinyal (SHAP #1)
+    - "USD_Lag1"             # Nominal fiyat momentum (SHAP #4)
+    - "USD_Lag3"             # 3 aylık orta vadeli sinyal
+    - "USD_Lag12"            # Yıllık mevsimsellik sinyali
+
+# Yeni Feature Engineering (build_features.py'ye eklenecek)
+new_features:
+  - name: "Uretim_Ton_Lag1"       # Türkiye'nin geçen yıl rekoltesi (arz şoku gecikmesi)
+    source: "Uretim_Ton_Turkiye"
+    lag: 12                        # 12 ay geriye git (yıllık veri)
+  - name: "TMO_Taban_PY"          # Önceki yıl TMO taban fiyatı (leakage yok)
+    source: "TMO_Giresun_TL_kg"
+    lag: 12
+  - name: "Kur_Volatilite_3A"     # 3 aylık kur oynaklığı (rolling std)
+    source: "USD_TRY_Kapanis"
+    window: 3
+    operation: "std"
 
 paths:
   data: "data/processed/master_features.csv"
@@ -101,6 +131,26 @@ conformal:
 # Dashboard
 dashboard:
   title: "Fındık Fiyat Tahmin Sistemi"
-  version: "3.1"
+  version: "3.2"
   usd_try_default: 44.0
   aylik_kur_artis_default: 0.8
+
+# TMO Model Feature Seti (tmo_model.py ile senkron)
+tmo_model:
+  target: "TMO_Giresun_TL_kg"
+  cv_strategy: "leave_one_out"    # Küçük örneklem için LOO
+  features:
+    - "USD_TRY_Kapanis"           # Döviz kuru → maliyet baskısı (ŞART)
+    - "Asgari_Ucret_TL"           # İşçilik maliyeti — devlet referansı (ŞART)
+    - "TUFE_Yillik_Pct"           # Yıllık enflasyon (ŞART)
+    - "Uretim_Ton_Turkiye"        # Türkiye rekoltesi — arz (ŞART)
+    - "Dunya_Tuketim_Ton"         # Dünya talebi
+    - "TMO_Lag1"                  # Geçen yılın taban fiyatı — referans (ŞART)
+    - "Serbest_Piyasa_TL_kg"      # Temmuz piyasa sinyali (strict leakage değil)
+    # Eklendi — Arz tarafı güçlendirme:
+    - "Azerbaycan_Uretim_Ton"     # Rakip ülke üretimi (SHAP #5 ana modelde)
+    - "Uretim_Ton_Dunyaa"         # Dünya toplam arzı
+  drop_if_missing:               # Bu kolonlar eksikse sessizce atla
+    - "Azerbaycan_Uretim_Ton"
+    - "Uretim_Ton_Dunyaa"
+    - "Dunya_Tuketim_Ton"

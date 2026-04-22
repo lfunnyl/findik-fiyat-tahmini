@@ -26,6 +26,7 @@ import os
 import warnings
 import logging
 import joblib
+import yaml
 import numpy as np
 import pandas as pd
 import mlflow
@@ -57,38 +58,22 @@ warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# ─── Sabit Yollar ───────────────────────────────────────────────────────────
+# ─── Konfigürasyon ve Yollar ──────────────────────────────────────────────────
 BASE_DIR    = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATA_PATH   = os.path.join(BASE_DIR, "data", "processed", "master_features.csv")
-MODELS_DIR  = os.path.join(BASE_DIR, "models")
-FIGURES_DIR = os.path.join(BASE_DIR, "reports", "figures")
+with open(os.path.join(BASE_DIR, "config.yaml"), "r", encoding="utf-8") as _f:
+    CFG = yaml.safe_load(_f)
+
+DATA_PATH      = os.path.join(BASE_DIR, "data", "processed", "master_features.csv")
+MODELS_DIR     = os.path.join(BASE_DIR, "models")
+FIGURES_DIR    = os.path.join(BASE_DIR, "reports", "figures")
 os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(FIGURES_DIR, exist_ok=True)
 
-TARGET = 'Fiyat_RealUSD_kg'  # 2024 baz yıllı reel USD (ABD enflasyonundan arındırılmış)
-
-# Model eğitiminde kullanmayacağımız sütunlar
-DROP_COLS = [
-    TARGET,
-    # Diğer hedef / türetilmiş fiyat sütunları (data leakage)
-    'Serbest_Piyasa_TL_kg', 'Fiyat_USD_kg', 'US_CPI_Carpani',
-    # Kimlik / zaman sütunları
-    'Tarih', 'Yil_Ay', 'Hasat_Donemi',
-    # Hedefle 0.98+ korelasyon → data leakage
-    'TMO_Giresun_TL_kg', 'TMO_Levant_TL_kg',
-    # Fiyat lag'ıları → dağılım kayması
-    'Fiyat_Lag1', 'Fiyat_Lag2', 'Fiyat_Lag3', 'Fiyat_Lag12',
-    # Hedeften türetilmiş değişim yüzdeleri
-    'Fiyat_Degisim_1A_Pct', 'Fiyat_Degisim_3A_Pct',
-    # Hedeften türetilmiş oran
-    'Fiyat_bolu_AsgariUcret_Orani',
-    # Saf trend proxy’sı
-    'Yil', 'Sezon_Yili',
-]
-
-TOP_N_FEATURES = 20  # Feature selection üst sınırı
-FEATURE_METHOD = 'mutual_info'  # 'correlation' veya 'mutual_info'
-
+TARGET         = CFG.get("target", "Fiyat_RealUSD_kg")
+TOP_N_FEATURES = int(CFG["model"].get("top_n_features", 15))
+FEATURE_METHOD = CFG["model"].get("feature_selection", "vif")
+DROP_COLS      = list(CFG.get("drop_cols", []))
+VIF_THRESHOLD  = float(CFG.get("multicollinearity", {}).get("vif_threshold", 10.0))
 
 
 # ─── Yardımcı Fonksiyonlar ──────────────────────────────────────────────────
@@ -131,12 +116,11 @@ def prepare_xy(df):
 
 def select_features(X_train, y_train, top_n=TOP_N_FEATURES, method=FEATURE_METHOD):
     """
-    Train seti üzerinde feature selection.
-    method='mutual_info' → Mutual Information (doğrusal olmayan ilişkileri yakalar)
-    method='correlation' → Pearson korelasyonu (hızlı, doğrusal)
-    Yalnızca train verisini kullanarak seçim yapılır (test sızıntısı yok).
+    Ağaç bazlı modeller (XGBoost/LightGBM/CatBoost) için feature selection.
+    Bu modeller multikollineariteyi zaten doğal olarak handle eder.
+    VIF burada UYGULANMAZ — o sadece Ridge için (select_features_ridge).
     """
-    if method == 'mutual_info':
+    if method in ('mutual_info', 'vif'):  # vif modunda bile tree modeller MI kullansin
         mi_scores = mutual_info_regression(X_train, y_train, random_state=42, n_neighbors=5)
         mi_series = pd.Series(mi_scores, index=X_train.columns).dropna()
         selected  = mi_series.nlargest(top_n).index.tolist()
@@ -145,7 +129,36 @@ def select_features(X_train, y_train, top_n=TOP_N_FEATURES, method=FEATURE_METHO
         corr = X_train.corrwith(y_train).abs().dropna()
         selected = corr.nlargest(top_n).index.tolist()
         logger.info(f"  Feature Selection (Corr): {len(X_train.columns)} → {len(selected)} özellik")
-    logger.info(f"  Top 10: {selected[:10]}")
+
+    logger.info(f"  Top-5: {selected[:5]}")
+    return selected
+
+
+def select_features_ridge(X_train, y_train, top_n=TOP_N_FEATURES):
+    """
+    Sadece Ridge Regression için: MI + VIF hibrit seçimi.
+    En önemli top-3 MI feature'ları (RealUSD_Lag1 vb.) her zaman korunur,
+    geri kalan adaylar arasından VIF > threshold olan elenir.
+    """
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+    mi_scores  = mutual_info_regression(X_train, y_train, random_state=42, n_neighbors=5)
+    mi_series  = pd.Series(mi_scores, index=X_train.columns).dropna()
+    top_by_mi  = mi_series.nlargest(top_n).index.tolist()
+
+    X_sub     = X_train[top_by_mi].fillna(0).copy()
+    protected = set(top_by_mi[:3])   # En kritik 3 feature her zaman kalsın
+
+    while X_sub.shape[1] > 5:
+        vifs       = [variance_inflation_factor(X_sub.values, i) for i in range(X_sub.shape[1])]
+        vif_series = pd.Series(vifs, index=X_sub.columns)
+        candidates = vif_series.drop(labels=[c for c in protected if c in vif_series.index])
+        if candidates.empty or candidates.max() <= VIF_THRESHOLD:
+            break
+        X_sub = X_sub.drop(columns=[candidates.idxmax()])
+
+    selected = X_sub.columns.tolist()
+    logger.info(f"  Feature Selection (MI+VIF Ridge): {len(X_train.columns)} → {len(selected)} özellik")
     return selected
 
 
@@ -262,7 +275,7 @@ def train_baseline(X_train, X_test, y_train_log, y_test_raw):
     logger.info("\n" + "="*60)
     logger.info("ADIM 1: BASELINE — Ridge Regression (Log-Transform)")
     logger.info("="*60)
-    sel_cols = select_features(X_train, y_train_log)
+    sel_cols = select_features_ridge(X_train, y_train_log)
     X_tr_sel = X_train[sel_cols]
     X_te_sel = X_test[sel_cols]
 

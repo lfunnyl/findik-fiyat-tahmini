@@ -1,0 +1,95 @@
+{
+  "features": [
+    {
+      "rank": 1,
+      "name": "Önceki Ay Reel Fiyat",
+      "raw_name": "Önceki Ay Reel Fiyat",
+      "importance": 0.0684
+    },
+    {
+      "rank": 2,
+      "name": "USD_TRY_Kapanis",
+      "raw_name": "USD_TRY_Kapanis",
+      "importance": 0.0291
+    },
+    {
+      "rank": 3,
+      "name": "Asgari Ücret (TL)",
+      "raw_name": "Asgari Ücret (TL)",
+      "importance": 0.0097
+    },
+    {
+      "rank": 4,
+      "name": "Önceki Ay USD Fiyat",
+      "raw_name": "Önceki Ay USD Fiyat",
+      "importance": 0.008
+    },
+    {
+      "rank": 5,
+      "name": "Azerbaycan_Uretim_Ton",
+      "raw_name": "Azerbaycan_Uretim_Ton",
+      "importance": 0.0074
+    },
+    {
+      "rank": 6,
+      "name": "TUFE_Yillik_Pct",
+      "raw_name": "TUFE_Yillik_Pct",
+      "importance": 0.007
+    },
+    {
+      "rank": 7,
+      "name": "3 Ay Öncesi USD Fiyat",
+      "raw_name": "3 Ay Öncesi USD Fiyat",
+      "importance": 0.0025
+    },
+    {
+      "rank": 8,
+      "name": "3 Ay Öncesi Reel Fiyat",
+      "raw_name": "3 Ay Öncesi Reel Fiyat",
+      "importance": 0.0019
+    },
+    {
+      "rank": 9,
+      "name": "USD_Lag2",
+      "raw_name": "USD_Lag2",
+      "importance": 0.001
+    },
+    {
+      "rank": 10,
+      "name": "Uretim_Ton_Dunyaa",
+      "raw_name": "Uretim_Ton_Dunyaa",
+      "importance": 0.001
+    },
+    {
+      "rank": 11,
+      "name": "Dogalgaz_ETF_Kapanis",
+      "raw_name": "Dogalgaz_ETF_Kapanis",
+      "importance": 0.0009
+    },
+    {
+      "rank": 12,
+      "name": "Altin_Ons_Kapanis",
+      "raw_name": "Altin_Ons_Kapanis",
+      "importance": 0.0004
+    },
+    {
+      "rank": 13,
+      "name": "Italya_Uretim_Ton",
+      "raw_name": "Italya_Uretim_Ton",
+      "importance": 0.0003
+    },
+    {
+      "rank": 14,
+      "name": "Ihracat_Deger_mUSD",
+      "raw_name": "Ihracat_Deger_mUSD",
+      "importance": 0.0
+    },
+    {
+      "rank": 15,
+      "name": "TCMB_Faiz_Orani",
+      "raw_name": "TCMB_Faiz_Orani",
+      "importance": 0.0
+    }
+  ],
+  "generated_at": "2026-04-22T13:38:17.352392"
+}
