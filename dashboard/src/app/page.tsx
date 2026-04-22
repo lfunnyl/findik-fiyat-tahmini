@@ -42,6 +42,7 @@ export default function Home() {
   const { data: causal } = useSWR('causal', api.causal, { revalidateOnFocus: false })
   const { data: history } = useSWR('history', () => api.history(30), { revalidateOnFocus: false })
   const { data: info } = useSWR('info', api.info, { revalidateOnFocus: false })
+  const { data: shap } = useSWR('shap', api.shap, { revalidateOnFocus: false })
   const { data: wi } = useSWR(
     ['whatif', wiKur, wiRekolte, wiPetrol],
     () => api.whatif({ usd_try: wiKur, brent_petrol: wiPetrol, rekolte_degisim_pct: wiRekolte, ihracat_degisim_pct: 0 }),
@@ -142,8 +143,8 @@ export default function Home() {
                   <MetricCard label="Nisan 2026" value={`${nisTL.toFixed(1)} TL/kg`} />
                   <MetricCard label="Aralık 2026" value={`${aralikTL.toFixed(1)} TL/kg`} delta={`${(aralikTL - nisTL) > 0 ? '+' : ''}${(aralikTL - nisTL).toFixed(1)} TL`} deltaNeg={aralikTL < nisTL} />
                   <MetricCard label="2026 Ort." value={`${ortTL.toFixed(1)} TL/kg`} />
-                  <MetricCard label="TMO Tahmin" value={tmo ? `≈${tmo.pred_2026} TL/kg` : '…'} />
-                  <MetricCard label="Model MAPE" value="%9.05" delta="Weighted Ensemble" />
+                  <MetricCard label="TMO Tahmin" value={tmo ? `${tmo.pred_2026.toFixed(1)} TL/kg` : '…'} delta={tmo ? `%${tmo.buyume_pct} beklenen artış` : ''} />
+                  <MetricCard label="Hata Payı" value={`%${pred?.model_info?.test_mape?.toFixed(1) ?? '9.1'}`} delta="MAPE (Test)" />
                 </>
               )}
             </div>
@@ -262,12 +263,37 @@ export default function Home() {
             )}
 
             {causal && (
-              <div className="card glass">
+              <div className="card glass" style={{ marginBottom: 24 }}>
                 <div className="section-title">🔬 Double ML Nedensel Etki</div>
                 <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginTop: 12 }}>
                   <div><span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--accent)' }}>+{causal.average_treatment_effect} TL/kg</span></div>
                   <div style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', maxWidth: 500, lineHeight: 1.7 }}>{causal.yorum}</div>
                 </div>
+              </div>
+            )}
+
+            {shap && (
+              <div className="card">
+                <div className="section-title">🧬 Model Karar Faktörleri (SHAP)</div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 16 }}>Modelin fiyatı tahmin ederken hangi değişkenlere ne kadar güvendiğini gösterir.</p>
+                <Plot
+                  data={[{
+                    x: shap.map(s => s.importance),
+                    y: shap.map(s => s.feature),
+                    type: 'bar', orientation: 'h',
+                    marker: { 
+                      color: shap.map((_, i) => `rgba(124, 106, 247, ${1 - i * 0.05})`),
+                      line: { color: 'white', width: 0.5 }
+                    }
+                  }]}
+                  layout={{
+                    ...DARK, height: 400, margin: { l: 160, r: 40, t: 10, b: 40 },
+                    xaxis: { gridcolor: 'rgba(255,255,255,0.06)', zeroline: false, title: 'Önem Skoru' },
+                    yaxis: { gridcolor: 'rgba(255,255,255,0.06)', zeroline: false },
+                  }}
+                  config={{ displayModeBar: false, responsive: true }}
+                  style={{ width: '100%' }}
+                />
               </div>
             )}
           </div>

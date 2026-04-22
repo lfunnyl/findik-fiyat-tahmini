@@ -62,6 +62,11 @@ export interface CausalEffect {
   yorum: string
 }
 
+export interface ShapImportance {
+  feature: string
+  importance: number
+}
+
 export interface HistoricalPrice {
   Tarih: string
   Serbest_Piyasa_TL_kg: number
@@ -124,7 +129,7 @@ export const api = {
 
   causal: () => apiFetch<CausalEffect>('/api/causal'),
 
-  history: (months = 36) => apiFetch<HistoricalPrice[]>(`/api/history?months=${months}`),
-
-  info: () => apiFetch<ModelInfo>('/api/info'),
+  history: (months: number) => apiFetch<HistoricalPrice[]>(`/history?months=${months}`),
+  info: () => apiFetch<ModelInfo>('/info'),
+  shap: () => apiFetch<ShapImportance[]>('/shap'),
 }

@@ -428,6 +428,16 @@ def causal_effect():
     raise HTTPException(status_code=404, detail="Nedensel etki verisi bulunamadı.")
 
 
+@app.get("/api/shap", tags=["Analiz"])
+def shap_importance():
+    """Modelin karar verirken hangi özelliklere ne kadar önem verdiğini gösteren SHAP verileri."""
+    shap_path = MODELS_DIR / "shap_importance.json"
+    if shap_path.exists():
+        with open(shap_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    raise HTTPException(status_code=404, detail="SHAP verisi bulunamadı.")
+
+
 @app.get("/api/weather", tags=["Veri"])
 def weather_data():
     """Karadeniz hava durumu & iklim riski (3 aylık öngörü)."""
