@@ -129,7 +129,7 @@ export const api = {
 
   causal: () => apiFetch<CausalEffect>('/api/causal'),
 
-  history: (months: number) => apiFetch<HistoricalPrice[]>(`/history?months=${months}`),
-  info: () => apiFetch<ModelInfo>('/info'),
-  shap: () => apiFetch<ShapImportance[]>('/shap'),
+  history: (months: number) => apiFetch<HistoricalPrice[]>(`/api/history?months=${months}`),
+  info: () => apiFetch<ModelInfo>('/api/info'),
+  shap: () => apiFetch<ShapImportance[]>('/api/shap'),
 }

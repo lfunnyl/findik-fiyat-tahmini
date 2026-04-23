@@ -102,6 +102,12 @@ def shap_importance():
     with open(MODELS_DIR / "shap_importance.json", "r") as f:
         return json.load(f)
 
+@app.get("/api/causal")
+def causal_effect():
+    import json
+    with open(MODELS_DIR / "causal_effect.json", "r") as f:
+        return json.load(f)
+
 @app.get("/api/history")
 def history(months: int = 36):
     df = prediction_service.df

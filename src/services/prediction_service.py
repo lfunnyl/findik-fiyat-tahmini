@@ -140,5 +140,16 @@ class PredictionService:
             "whatif_reel_usd": round(wi_reel, 4), "whatif_nominal_usd": round(wi_nom, 4)
         }
 
+    def get_tmo_data(self) -> Dict[str, Any]:
+        """TMO fiyat tahminini döndürür."""
+        tmo_path = MODELS_DIR / "tmo_prediction_2026.json"
+        if tmo_path.exists():
+            try:
+                with open(tmo_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"TMO tahmini okunamadı: {e}")
+        return {}
+
 # Singleton
 prediction_service = PredictionService()

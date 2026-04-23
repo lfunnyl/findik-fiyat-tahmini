@@ -1,6 +1,5 @@
 [phases.setup]
-language = "python"
-pythonCanvas = "3.12"
+nixPkgs = ["python311"]
 
 [phases.install]
 cmds = ["pip install -r requirements-api.txt"]
