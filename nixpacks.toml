@@ -1,5 +1,6 @@
 [phases.setup]
 nixPkgs = ["python311"]
+aptPkgs = ["libgomp1"]
 
 [phases.install]
 cmds = ["pip install -r requirements-api.txt"]
