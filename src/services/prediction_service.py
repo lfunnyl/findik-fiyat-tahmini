@@ -22,7 +22,7 @@ class PredictionService:
         """Tüm modelleri ve verileri yükler."""
         try:
             # Model Paketleri
-            for m in ['xgboost', 'lightgbm', 'ridge']:
+            for m in ['xgboost', 'ridge']:
                 p = MODELS_DIR / f"{m}_model.pkl"
                 if p.exists():
                     self.models[m] = joblib.load(p)
@@ -56,12 +56,11 @@ class PredictionService:
             raise
 
     def predict_single(self, row_dict: dict, kur: float, yil: int = 2026) -> Tuple[float, float, float]:
-        """Weighted ensemble tahmini: XGBoost + LightGBM + Ridge."""
+        """Weighted ensemble tahmini: XGBoost + Ridge."""
         X = pd.DataFrame([row_dict])
         
         # Bireysel Tahminler
         p_xgb = float(np.expm1(self.models['xgboost']['model'].predict(X[self.sel_cols])[0]))
-        p_lgb = float(np.expm1(self.models['lightgbm']['model'].predict(X[self.sel_cols])[0]))
         
         try:
             X_ridge = self.models['ridge']['scaler'].transform(X[self.sel_cols])
@@ -71,9 +70,8 @@ class PredictionService:
             
         w = self.weights
         reel = (
-            w.get("XGBoost", 0.60) * p_xgb +
-            w.get("CatBoost", 0.15) * p_lgb +
-            w.get("Ridge", 0.25) * p_ridge
+            w.get("XGBoost", 0.72) * p_xgb +
+            w.get("Ridge", 0.28) * p_ridge
         )
         nom, tl = reel_usd_to_tl(reel, kur, yil)
         return reel, nom, tl
