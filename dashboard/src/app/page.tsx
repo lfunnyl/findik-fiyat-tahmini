@@ -186,6 +186,7 @@ export default function Home() {
                     ...DARK,
                     height: 380,
                     hovermode: 'x unified',
+                    hoverlabel: { bgcolor: '#1e1e2e', bordercolor: 'rgba(255,255,255,0.1)', font: { color: 'white', family: 'Inter' } },
                     xaxis: { gridcolor: 'rgba(255,255,255,0.06)', zeroline: false },
                     yaxis: { gridcolor: 'rgba(255,255,255,0.06)', zeroline: false, ticksuffix: ' TL' },
                     legend: { bgcolor: 'rgba(255,255,255,0.05)', bordercolor: 'rgba(255,255,255,0.1)', borderwidth: 1 },
@@ -278,11 +279,11 @@ export default function Home() {
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 16 }}>Modelin fiyatı tahmin ederken hangi değişkenlere ne kadar güvendiğini gösterir.</p>
                 <Plot
                   data={[{
-                    x: shap.map(s => s.importance),
-                    y: shap.map(s => s.feature),
+                    x: shap.map((s: any) => s.importance),
+                    y: shap.map((s: any) => s.feature),
                     type: 'bar', orientation: 'h',
                     marker: { 
-                      color: shap.map((_, i) => `rgba(124, 106, 247, ${1 - i * 0.05})`),
+                      color: shap.map((_: any, i: number) => `rgba(124, 106, 247, ${1 - i * 0.05})`),
                       line: { color: 'white', width: 0.5 }
                     }
                   }]}

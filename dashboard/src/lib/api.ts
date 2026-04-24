@@ -131,5 +131,11 @@ export const api = {
 
   history: (months: number) => apiFetch<HistoricalPrice[]>(`/api/history?months=${months}`),
   info: () => apiFetch<ModelInfo>('/api/info'),
-  shap: () => apiFetch<ShapImportance[]>('/api/shap'),
+  shap: () => apiFetch<any>('/api/shap').then(res => {
+    if (Array.isArray(res)) return res;
+    return (res.features || []).map((f: any) => ({
+      feature: f.name || f.feature,
+      importance: f.importance
+    }));
+  }),
 }
