@@ -302,7 +302,7 @@ def train_xgboost(X, y_log, X_train, X_test, y_train_log, y_test_raw):
 
     def xgb_factory():
         return xgb.XGBRegressor(
-            n_estimators=400, learning_rate=0.05, max_depth=3,
+            n_estimators=200, learning_rate=0.05, max_depth=5,
             subsample=0.8, colsample_bytree=0.7,
             min_child_weight=5, reg_alpha=0.3, reg_lambda=1.0,
             random_state=42, verbosity=0
@@ -316,7 +316,7 @@ def train_xgboost(X, y_log, X_train, X_test, y_train_log, y_test_raw):
     X_te_sel = X_test[sel_cols]
 
     xgb_model = xgb.XGBRegressor(
-        n_estimators=400, learning_rate=0.05, max_depth=3,
+        n_estimators=200, learning_rate=0.05, max_depth=5,
         subsample=0.8, colsample_bytree=0.7,
         min_child_weight=5, reg_alpha=0.3, reg_lambda=1.0,
         random_state=42, verbosity=0, early_stopping_rounds=30
@@ -342,7 +342,7 @@ def train_lightgbm(X, y_log, X_train, X_test, y_train_log, y_test_raw):
 
     def lgb_factory():
         return lgb.LGBMRegressor(
-            n_estimators=400, learning_rate=0.05, num_leaves=20,
+            n_estimators=200, learning_rate=0.05, num_leaves=31, max_depth=5,
             min_child_samples=15, subsample=0.8, colsample_bytree=0.7,
             reg_alpha=0.3, reg_lambda=1.0, random_state=42, verbose=-1
         )
@@ -354,7 +354,7 @@ def train_lightgbm(X, y_log, X_train, X_test, y_train_log, y_test_raw):
     X_te_sel = X_test[sel_cols]
 
     lgb_model = lgb.LGBMRegressor(
-        n_estimators=400, learning_rate=0.05, num_leaves=20,
+        n_estimators=200, learning_rate=0.05, num_leaves=31, max_depth=5,
         min_child_samples=15, subsample=0.8, colsample_bytree=0.7,
         reg_alpha=0.3, reg_lambda=1.0, random_state=42, verbose=-1
     )

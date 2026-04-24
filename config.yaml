@@ -55,6 +55,8 @@ drop_cols:
   - "Altin_Ons_Kapanis"     # SHAP=0.0004 — anlamsız sinyal
   - "Ihracat_Deger_mUSD"    # SHAP=0.0000 — sıfır etki
   - "TCMB_Faiz_Orani"       # SHAP=0.0000 — sıfır etki
+  - "Dogalgaz_ETF_Kapanis"  # İlgisiz sinyal
+  - "TUFE_Yillik_Pct"       # Serbest piyasada endirekt etki
   # --- Multikolinearite: Lag Redundansı ---
   - "USD_Lag2"              # Lag1 ve Lag3 zaten mevcut; Lag2 gereksiz
 

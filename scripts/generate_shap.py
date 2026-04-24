@@ -114,17 +114,13 @@ def load_data_and_model():
     X = df.drop(columns=drop_existing).select_dtypes(include=[np.number])
     y_log = np.log1p(df[TARGET])
 
-    # Train/test split (80/20)
-    n = len(df)
-    split_idx = int(n * 0.80)
-    corr = X.iloc[:split_idx].corrwith(y_log.iloc[:split_idx]).abs().dropna()
-    sel_cols = corr.nlargest(TOP_N).index.tolist()
-    X_sel = X[sel_cols]
-
     # Modeli yükle
     print("🤖 XGBoost modeli yükleniyor...")
     bundle    = joblib.load(os.path.join(MODELS_DIR, "xgboost_model.pkl"))
     xgb_model = bundle["model"] if isinstance(bundle, dict) else bundle
+    sel_cols  = bundle["features"]
+
+    X_sel = X[sel_cols]
 
     # İnsan okunabilir özellik isimleri
     display_names = [FEATURE_LABELS.get(c, c) for c in sel_cols]
@@ -271,6 +267,7 @@ def plot_dependence(shap_values, X, display_names):
 def save_shap_json(shap_values, display_names):
     """API için SHAP önem skorlarını JSON olarak kaydet."""
     mean_abs = np.abs(shap_values).mean(axis=0)
+    total_shap = mean_abs.sum()
     sorted_idx = np.argsort(mean_abs)[::-1]
 
     data = {
@@ -279,7 +276,7 @@ def save_shap_json(shap_values, display_names):
                 "rank":      int(i + 1),
                 "name":      display_names[idx],
                 "raw_name":  display_names[idx],
-                "importance": round(float(mean_abs[idx]), 4),
+                "importance": round(float(mean_abs[idx] / total_shap) * 100, 2),
             }
             for i, idx in enumerate(sorted_idx[:15])
         ],
