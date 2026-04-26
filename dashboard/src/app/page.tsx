@@ -100,8 +100,8 @@ export default function Home() {
               }
             </div>
           )}
-          <div style={{ marginTop: 8 }}><strong>Test MAPE:</strong> %{pred?.model_info?.test_mape?.toFixed(2) ?? '9.05'}</div>
-          <div><strong>Test R²:</strong> {pred?.model_info?.test_r2?.toFixed(3) ?? '0.453'}</div>
+          <div style={{ marginTop: 8 }}><strong>Test MAPE:</strong> %{pred?.model_info?.test_mape?.toFixed(2) ?? '5.06'}</div>
+          <div><strong>Test R²:</strong> {pred?.model_info?.test_r2?.toFixed(3) ?? '0.800'}</div>
           <div style={{ marginTop: 8 }}><strong>Hedef:</strong> Reel USD/kg</div>
           <div><strong>Veri:</strong> {info ? `${info.data_rows} aylık` : '152 aylık'}</div>
           {info?.data_end && <div><strong>Son veri:</strong> {info.data_end.slice(0, 7)}</div>}
@@ -114,7 +114,7 @@ export default function Home() {
         <div className="hero fade-up">
           <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
             <span className="badge badge-purple">Weighted Ensemble</span>
-            <span className="badge badge-green">MAPE %9.05</span>
+            <span className="badge badge-green">MAPE %5.06</span>
             <span className="badge badge-orange">2026 Tahmini</span>
           </div>
           <h1 className="hero-title gradient-text">Fındık Fiyat Tahmin Sistemi</h1>
@@ -144,7 +144,7 @@ export default function Home() {
                   <MetricCard label="Aralık 2026" value={`${aralikTL.toFixed(1)} TL/kg`} delta={`${(aralikTL - nisTL) > 0 ? '+' : ''}${(aralikTL - nisTL).toFixed(1)} TL`} deltaNeg={aralikTL < nisTL} />
                   <MetricCard label="2026 Ort." value={`${ortTL.toFixed(1)} TL/kg`} />
                   <MetricCard label="TMO Tahmin" value={tmo ? `${tmo.pred_2026.toFixed(1)} TL/kg` : '…'} delta={tmo ? `%${tmo.buyume_pct} beklenen artış` : ''} />
-                  <MetricCard label="Hata Payı" value={`%${pred?.model_info?.test_mape?.toFixed(1) ?? '9.1'}`} delta="MAPE (Test)" />
+                  <MetricCard label="Hata Payı" value={`%${pred?.model_info?.test_mape?.toFixed(1) ?? '5.1'}`} delta="MAPE (Test)" />
                 </>
               )}
             </div>
@@ -234,9 +234,9 @@ export default function Home() {
         {tab === 'model' && (
           <div className="fade-up">
             <div className="grid-4" style={{ marginBottom: 28 }}>
-              <MetricCard label="Test MAPE" value={`%${pred?.model_info?.test_mape?.toFixed(2) ?? scores?.['Weighted Ensemble']?.MAPE?.toFixed(2) ?? '9.05'}`} delta="Weighted Ensemble" />
-              <MetricCard label="Test R²" value={(pred?.model_info?.test_r2 ?? scores?.['Weighted Ensemble']?.R2 ?? 0.453).toFixed(3)} />
-              <MetricCard label="Test MAE" value={`${(scores?.['Weighted Ensemble']?.MAE ?? 0.494).toFixed(3)} USD/kg`} />
+              <MetricCard label="Test MAPE" value={`%${pred?.model_info?.test_mape?.toFixed(2) ?? scores?.['Weighted Ensemble']?.MAPE?.toFixed(2) ?? '5.06'}`} delta="Delta Modeling" />
+              <MetricCard label="Test R²" value={(pred?.model_info?.test_r2 ?? scores?.['Weighted Ensemble']?.R2 ?? 0.800).toFixed(3)} />
+              <MetricCard label="Test MAE" value={`${(scores?.['Weighted Ensemble']?.MAE ?? 0.276).toFixed(3)} USD/kg`} />
               <MetricCard label="Nedensel Etki (ATE)" value={causal ? `+${causal.average_treatment_effect} TL` : '…'} delta="1 birim kur artışı → fiyata etki" />
             </div>
 
