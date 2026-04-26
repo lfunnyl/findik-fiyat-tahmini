@@ -49,3 +49,7 @@ coverage.xml
 
 # ── Jupyter ──
 .ipynb_checkpoints/
+
+# ── CatBoost & Logs ──
+catboost_info/
+pipeline.log
