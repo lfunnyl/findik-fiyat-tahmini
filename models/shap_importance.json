@@ -2,94 +2,94 @@
   "features": [
     {
       "rank": 1,
-      "name": "Önceki Ay Reel Fiyat",
-      "raw_name": "Önceki Ay Reel Fiyat",
-      "importance": 39.76
+      "name": "Kur_Aylik_Degisim_Pct",
+      "raw_name": "Kur_Aylik_Degisim_Pct",
+      "importance": 32.39
     },
     {
       "rank": 2,
-      "name": "USD_TRY_Kapanis",
-      "raw_name": "USD_TRY_Kapanis",
-      "importance": 39.58
+      "name": "Ay",
+      "raw_name": "Ay",
+      "importance": 31.3
     },
     {
       "rank": 3,
-      "name": "Önceki Ay USD Fiyat",
-      "raw_name": "Önceki Ay USD Fiyat",
-      "importance": 8.87
+      "name": "Fiyat_MA3_Farki_Pct",
+      "raw_name": "Fiyat_MA3_Farki_Pct",
+      "importance": 8.53
     },
     {
       "rank": 4,
-      "name": "Asgari Ücret (TL)",
-      "raw_name": "Asgari Ücret (TL)",
-      "importance": 5.14
+      "name": "TMO_Mevcut_Makas_Pct",
+      "raw_name": "TMO_Mevcut_Makas_Pct",
+      "importance": 7.77
     },
     {
       "rank": 5,
-      "name": "Ihracat_Ton_YoY_Pct",
-      "raw_name": "Ihracat_Ton_YoY_Pct",
-      "importance": 3.42
+      "name": "Kur_Volatilite_3Ay",
+      "raw_name": "Kur_Volatilite_3Ay",
+      "importance": 4.7
     },
     {
       "rank": 6,
-      "name": "Rekolte_Surprise_Lag1",
-      "raw_name": "Rekolte_Surprise_Lag1",
-      "importance": 1.78
+      "name": "Yıllık Değişim (%)",
+      "raw_name": "Yıllık Değişim (%)",
+      "importance": 4.42
     },
     {
       "rank": 7,
-      "name": "3 Ay Öncesi Reel Fiyat",
-      "raw_name": "3 Ay Öncesi Reel Fiyat",
-      "importance": 1.2
+      "name": "Asgari Ücret (TL)",
+      "raw_name": "Asgari Ücret (TL)",
+      "importance": 3.39
     },
     {
       "rank": 8,
-      "name": "Dunya_Uretim_Ton",
-      "raw_name": "Dunya_Uretim_Ton",
-      "importance": 0.24
+      "name": "Ihracat_Ton_YoY_Pct",
+      "raw_name": "Ihracat_Ton_YoY_Pct",
+      "importance": 2.55
     },
     {
       "rank": 9,
-      "name": "Rekolte_Sapma_Ton",
-      "raw_name": "Rekolte_Sapma_Ton",
-      "importance": 0.0
+      "name": "BDI_Endeksi",
+      "raw_name": "BDI_Endeksi",
+      "importance": 2.24
     },
     {
       "rank": 10,
-      "name": "Uretim_Ton_Azerbaycan",
-      "raw_name": "Uretim_Ton_Azerbaycan",
-      "importance": 0.0
+      "name": "RealUSD_YoY_pct",
+      "raw_name": "RealUSD_YoY_pct",
+      "importance": 1.78
     },
     {
       "rank": 11,
-      "name": "TR_Uretim_MA3",
-      "raw_name": "TR_Uretim_MA3",
-      "importance": 0.0
+      "name": "TR_Rekolte_Tahmin_Ton",
+      "raw_name": "TR_Rekolte_Tahmin_Ton",
+      "importance": 0.46
     },
     {
       "rank": 12,
-      "name": "Ihracat_Ton_Ic_Findik",
-      "raw_name": "Ihracat_Ton_Ic_Findik",
-      "importance": 0.0
+      "name": "Rekolte_Surprise_Pct",
+      "raw_name": "Rekolte_Surprise_Pct",
+      "importance": 0.35
     },
     {
       "rank": 13,
-      "name": "TR_Rekolte_Gercek_Ton",
-      "raw_name": "TR_Rekolte_Gercek_Ton",
-      "importance": 0.0
+      "name": "Regime_Shock_Warning",
+      "raw_name": "Regime_Shock_Warning",
+      "importance": 0.11
     },
     {
       "rank": 14,
-      "name": "Azerbaycan_Uretim_Ton",
-      "raw_name": "Azerbaycan_Uretim_Ton",
+      "name": "Kritik_Don",
+      "raw_name": "Kritik_Don",
       "importance": 0.0
     },
     {
       "rank": 15,
-      "name": "Rekolte_Surprise_Pct",
-      "raw_name": "Rekolte_Surprise_Pct",
+      "name": "TMO_Fiyat_Artis_Pct",
+      "raw_name": "TMO_Fiyat_Artis_Pct",
       "importance": 0.0
     }
   ],
-  "generated_at": "2026-04-25T00:19:04.350467"
+  "generated_at": "2026-04-26T23:13:42.395844"
 }

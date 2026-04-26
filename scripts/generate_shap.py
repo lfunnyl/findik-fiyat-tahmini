@@ -98,20 +98,43 @@ def load_data_and_model():
     df["Tarih"] = pd.to_datetime(df["Tarih"])
     df = df.sort_values("Tarih").reset_index(drop=True)
 
-    # Lag özellikler
-    df["USD_Lag1"]     = df["Fiyat_USD_kg"].shift(1)
-    df["USD_Lag2"]     = df["Fiyat_USD_kg"].shift(2)
-    df["USD_Lag3"]     = df["Fiyat_USD_kg"].shift(3)
-    df["USD_Lag12"]    = df["Fiyat_USD_kg"].shift(12)
-    df["USD_MoM_pct"]  = df["Fiyat_USD_kg"].pct_change(1) * 100
-    df["USD_YoY_pct"]  = df["Fiyat_USD_kg"].pct_change(12) * 100
-    df["RealUSD_Lag1"] = df["Fiyat_RealUSD_kg"].shift(1)
-    df["RealUSD_Lag3"] = df["Fiyat_RealUSD_kg"].shift(3)
+    # Lag özellikler (train_model.py ile BİREBİR AYNI olmalı)
+    # DİKKAT: Sızıntıyı önlemek için önce .shift(1) alınıp sonra hesaplanır
+    df["USD_MoM_pct"]     = df["Fiyat_USD_kg"].shift(1).pct_change(1) * 100
+    df["USD_YoY_pct"]     = df["Fiyat_USD_kg"].shift(1).pct_change(12) * 100
+    df["RealUSD_MoM_pct"] = df["Fiyat_RealUSD_kg"].shift(1).pct_change(1) * 100
+    df["RealUSD_YoY_pct"] = df["Fiyat_RealUSD_kg"].shift(1).pct_change(12) * 100
+    
+    # Yeni Causal / Momentum Features
+    df['RealUSD_MA3'] = df['Fiyat_RealUSD_kg'].shift(1).rolling(window=3).mean()
+    df['RealUSD_MA6'] = df['Fiyat_RealUSD_kg'].shift(1).rolling(window=6).mean()
+    df['Fiyat_MA3_Farki_Pct'] = (df['Fiyat_RealUSD_kg'].shift(1) - df['RealUSD_MA3']) / df['RealUSD_MA3'] * 100
+    df["Kur_Aylik_Ivme"]  = df["USD_TRY_Kapanis"].shift(1).pct_change(1) * 100
+    df['Kur_Volatilite_3Ay'] = df['USD_TRY_Kapanis'].shift(1).rolling(window=3).std()
+    
     df = df.bfill().ffill()
+    
+    # --- YENİ EKLENEN: Regime Detection (Şok Alarmı) ---
+    volatilite_mean = df['Kur_Volatilite_3Ay'].mean()
+    is_shock = (df['Kur_Volatilite_3Ay'] > volatilite_mean * 2)
+    if 'Kritik_Don' in df.columns:
+        is_shock = is_shock | (df['Kritik_Don'] > 0)
+    df['Regime_Shock_Warning'] = np.where(is_shock, 1, 0)
+    
+    # --- YENİ EKLENEN: TMO Müdahalesi (Policy Causal Feature) ---
+    df['TMO_Fiyat_Artis_Pct'] = df['TMO_Giresun_TL_kg'].pct_change(1) * 100
+    df['TMO_Mevcut_Makas_Pct'] = (df['TMO_Giresun_TL_kg'] - df['Serbest_Piyasa_TL_kg'].shift(1)) / df['Serbest_Piyasa_TL_kg'].shift(1) * 100
 
-    # Özellik matrisi
-    drop_existing = [c for c in DROP_COLS if c in df.columns]
+    # Özellik matrisi (Yasaklı lagları çıkar)
+    yasakli_laglar = [
+        "Fiyat_Lag1", "Fiyat_Lag2", "Fiyat_Lag3", "Fiyat_Lag12",
+        "USD_Lag1", "USD_Lag2", "USD_Lag3", "USD_Lag12",
+        "RealUSD_Lag1", "RealUSD_Lag3"
+    ]
+    drop_existing = [c for c in DROP_COLS + yasakli_laglar if c in df.columns]
     X = df.drop(columns=drop_existing).select_dtypes(include=[np.number])
+    
+    # SHAP script expects y_log = log(Target)
     y_log = np.log1p(df[TARGET])
 
     # Modeli yükle
