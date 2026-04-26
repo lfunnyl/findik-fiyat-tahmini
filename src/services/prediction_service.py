@@ -55,24 +55,34 @@ class PredictionService:
             logger.error(f"PredictionService yükleme hatası: {e}")
             raise
 
-    def predict_single(self, row_dict: dict, kur: float, yil: int = 2026) -> Tuple[float, float, float]:
+    def predict_single(self, row_dict: dict, kur: float, yil: int = 2026, prev_real_usd: Optional[float] = None) -> Tuple[float, float, float]:
         """Weighted ensemble tahmini: XGBoost + Ridge."""
         X = pd.DataFrame([row_dict])
         
-        # Bireysel Tahminler
-        p_xgb = float(np.expm1(self.models['xgboost']['model'].predict(X[self.sel_cols])[0]))
+        # Bireysel Tahminler (Artık bunlar DELTA LOG değerleri!)
+        p_xgb_delta = float(self.models['xgboost']['model'].predict(X[self.sel_cols])[0])
         
         try:
             X_ridge = self.models['ridge']['scaler'].transform(X[self.sel_cols])
-            p_ridge = float(np.expm1(self.models['ridge']['model'].predict(X_ridge)[0]))
+            p_ridge_delta = float(self.models['ridge']['model'].predict(X_ridge)[0])
         except:
-            p_ridge = p_xgb
+            p_ridge_delta = p_xgb_delta
             
         w = self.weights
-        reel = (
-            w.get("XGBoost", 0.72) * p_xgb +
-            w.get("Ridge", 0.28) * p_ridge
+        predicted_delta_log = (
+            w.get("XGBoost", 0.72) * p_xgb_delta +
+            w.get("Ridge", 0.28) * p_ridge_delta
         )
+        
+        # Delta Modeling Geri Dönüşümü (Reverse Transform)
+        if prev_real_usd is not None and prev_real_usd > 0:
+            prev_log = np.log1p(prev_real_usd)
+            current_log = prev_log + predicted_delta_log
+            reel = float(np.expm1(current_log))
+        else:
+            # Fallback
+            reel = float(np.expm1(predicted_delta_log))
+            
         nom, tl = reel_usd_to_tl(reel, kur, yil)
         return reel, nom, tl
 
@@ -102,7 +112,7 @@ class PredictionService:
             if "RealUSD_Lag1" in row: row["RealUSD_Lag1"] = prev_real_usd
             if "RealUSD_Lag3" in row: row["RealUSD_Lag3"] = prev3_real_usd
 
-            reel, nom, tl = self.predict_single(row, kur, 2026)
+            reel, nom, tl = self.predict_single(row, kur, 2026, prev_real_usd=prev_real_usd)
             
             results.append({
                 "ay": ay, "ay_adi": aylar_tr[ay], "kur": round(kur, 3),
@@ -121,6 +131,8 @@ class PredictionService:
         base_row = self.df[self.sel_cols].iloc[-1].to_dict()
         wi_row = dict(base_row)
 
+        prev_real_usd = float(self.df["Fiyat_RealUSD_kg"].iloc[-1])
+
         if brent is not None and "Brent_Petrol_Kapanis" in wi_row:
             wi_row["Brent_Petrol_Kapanis"] = brent
         if "USD_TRY_Kapanis" in wi_row:
@@ -129,8 +141,8 @@ class PredictionService:
         for col in ["Uretim_Ton", "Uretim_Ton_Turkiye"]:
             if col in wi_row: wi_row[col] *= (1 + rekolte_pct / 100)
 
-        wi_reel, wi_nom, wi_tl = self.predict_single(wi_row, usd_try, 2026)
-        base_reel, base_nom, base_tl = self.predict_single(base_row, 44.0, 2026)
+        wi_reel, wi_nom, wi_tl = self.predict_single(wi_row, usd_try, 2026, prev_real_usd=prev_real_usd)
+        base_reel, base_nom, base_tl = self.predict_single(base_row, 44.0, 2026, prev_real_usd=prev_real_usd)
 
         return {
             "whatif_tl": round(wi_tl, 2), "baz_tl": round(base_tl, 2),
