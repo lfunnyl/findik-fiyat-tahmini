@@ -12,21 +12,28 @@ if %errorlevel% neq 0 (
     exit /b %errorlevel%
 )
 
-echo [2/4] Ham Veriler isleniyor ve Ozellikler Turetiliyor...
+echo [2/5] Ham Veriler Temizleniyor...
+python src\data\data_cleaner.py
+if %errorlevel% neq 0 (
+    echo [HATA] Veri temizleme sirasinda hata olustu.
+    exit /b %errorlevel%
+)
+
+echo [3/5] Temizlenen Verilerden Ozellikler Turetiliyor...
 python src\features\build_features.py
 if %errorlevel% neq 0 (
     echo [HATA] Veri isleme sirasinda hata olustu.
     exit /b %errorlevel%
 )
 
-echo [3/4] Modeller Egitiliyor (XGBoost, LightGBM, CatBoost)...
+echo [4/5] Modeller Egitiliyor (XGBoost, LightGBM, CatBoost)...
 python src\models\train_model.py
 if %errorlevel% neq 0 (
     echo [HATA] Model egitimi sirasinda hata olustu.
     exit /b %errorlevel%
 )
 
-echo [4/4] SHAP Analizleri Uretiliyor...
+echo [5/5] SHAP Analizleri Uretiliyor...
 python scripts\generate_shap.py
 if %errorlevel% neq 0 (
     echo [UYARI] SHAP guncellemesinde sorun yasandi.
