@@ -101,8 +101,15 @@ class PredictionService:
         aylar_tr = {1:"Ocak", 2:"Şubat", 3:"Mart", 4:"Nisan", 5:"Mayıs", 6:"Haziran", 
                     7:"Temmuz", 8:"Ağustos", 9:"Eylül", 10:"Ekim", 11:"Kasım", 12:"Aralık"}
 
-        for ay in range(4, 13):
-            kur = start_kur * (1 + aylik_artis) ** (ay - 4)
+        last_ay = int(self.df["Ay"].iloc[-1])
+        start_ay = last_ay + 1
+        if start_ay > 12: start_ay = 1
+
+        end_ay = 12
+        if start_ay > end_ay: return []
+
+        for i, ay in enumerate(range(start_ay, end_ay + 1)):
+            kur = start_kur * (1 + aylik_artis) ** i
             row = dict(last_row)
             
             # Lag güncellemeleri

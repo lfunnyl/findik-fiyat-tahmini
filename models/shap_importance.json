@@ -4,79 +4,79 @@
       "rank": 1,
       "name": "Kur_Aylik_Degisim_Pct",
       "raw_name": "Kur_Aylik_Degisim_Pct",
-      "importance": 32.39
+      "importance": 33.14
     },
     {
       "rank": 2,
       "name": "Ay",
       "raw_name": "Ay",
-      "importance": 31.3
+      "importance": 30.78
     },
     {
       "rank": 3,
       "name": "Fiyat_MA3_Farki_Pct",
       "raw_name": "Fiyat_MA3_Farki_Pct",
-      "importance": 8.53
+      "importance": 8.57
     },
     {
       "rank": 4,
       "name": "TMO_Mevcut_Makas_Pct",
       "raw_name": "TMO_Mevcut_Makas_Pct",
-      "importance": 7.77
+      "importance": 8.25
     },
     {
       "rank": 5,
-      "name": "Kur_Volatilite_3Ay",
-      "raw_name": "Kur_Volatilite_3Ay",
-      "importance": 4.7
+      "name": "Yıllık Değişim (%)",
+      "raw_name": "Yıllık Değişim (%)",
+      "importance": 4.94
     },
     {
       "rank": 6,
-      "name": "Yıllık Değişim (%)",
-      "raw_name": "Yıllık Değişim (%)",
-      "importance": 4.42
+      "name": "Asgari Ücret (TL)",
+      "raw_name": "Asgari Ücret (TL)",
+      "importance": 3.93
     },
     {
       "rank": 7,
-      "name": "Asgari Ücret (TL)",
-      "raw_name": "Asgari Ücret (TL)",
-      "importance": 3.39
+      "name": "Kur_Volatilite_3Ay",
+      "raw_name": "Kur_Volatilite_3Ay",
+      "importance": 3.14
     },
     {
       "rank": 8,
-      "name": "Ihracat_Ton_YoY_Pct",
-      "raw_name": "Ihracat_Ton_YoY_Pct",
-      "importance": 2.55
+      "name": "BDI_Endeksi",
+      "raw_name": "BDI_Endeksi",
+      "importance": 2.49
     },
     {
       "rank": 9,
-      "name": "BDI_Endeksi",
-      "raw_name": "BDI_Endeksi",
-      "importance": 2.24
+      "name": "Ihracat_Ton_YoY_Pct",
+      "raw_name": "Ihracat_Ton_YoY_Pct",
+      "importance": 1.9
     },
     {
       "rank": 10,
       "name": "RealUSD_YoY_pct",
       "raw_name": "RealUSD_YoY_pct",
-      "importance": 1.78
+      "importance": 1.65
     },
     {
       "rank": 11,
       "name": "TR_Rekolte_Tahmin_Ton",
       "raw_name": "TR_Rekolte_Tahmin_Ton",
-      "importance": 0.46
+      "importance": 0.54
     },
     {
       "rank": 12,
       "name": "Rekolte_Surprise_Pct",
       "raw_name": "Rekolte_Surprise_Pct",
-      "importance": 0.35
+      "importance": 0.44
     },
     {
       "rank": 13,
       "name": "Regime_Shock_Warning",
       "raw_name": "Regime_Shock_Warning",
-      "importance": 0.11
+      "importance": 0.22
     },
     {
       "rank": 14,
@@ -91,5 +91,5 @@
       "importance": 0.0
     }
   ],
-  "generated_at": "2026-04-27T00:24:33.072920"
+  "generated_at": "2026-04-27T00:26:14.716410"
 }
