@@ -42,6 +42,8 @@ from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
 
+from src.features.engineering import apply_feature_engineering
+
 import xgboost as xgb
 import lightgbm as lgb
 try:
@@ -91,43 +93,7 @@ def prepare_xy(df):
     Feature ve Target matrislerini hazırlar.
     Hedef: log(Y_t) - log(Y_t-1) (Delta Log_Return)
     """
-    df = df.copy()
-    
-    # 1. YENİ YAPI: Sadece Gecikmeli Değişim (Lagged Change) özellikleri eklenecek
-    df['USD_MoM_pct']     = df['Fiyat_USD_kg'].shift(1).pct_change(1) * 100
-    df['USD_YoY_pct']     = df['Fiyat_USD_kg'].shift(1).pct_change(12) * 100
-    df['RealUSD_MoM_pct'] = df['Fiyat_RealUSD_kg'].shift(1).pct_change(1) * 100
-    df['RealUSD_YoY_pct'] = df['Fiyat_RealUSD_kg'].shift(1).pct_change(12) * 100
-    
-    # 2. FEATURE ENGINEERING (SHORT TERM): Hareketli Ortalamalar ve Volatilite
-    df['RealUSD_MA3'] = df['Fiyat_RealUSD_kg'].shift(1).rolling(window=3).mean()
-    df['RealUSD_MA6'] = df['Fiyat_RealUSD_kg'].shift(1).rolling(window=6).mean()
-    
-    # Fiyatın MA3'e olan uzaklığı (Momentum/Trend Gücü)
-    df['Fiyat_MA3_Farki_Pct'] = (df['Fiyat_RealUSD_kg'].shift(1) - df['RealUSD_MA3']) / df['RealUSD_MA3'] * 100
-    
-    # Kur aylık ivmesi ve Kur Volatilitesi
-    df['Kur_Aylik_Ivme']  = df['USD_TRY_Kapanis'].shift(1).pct_change(1) * 100
-    df['Kur_Volatilite_3Ay'] = df['USD_TRY_Kapanis'].shift(1).rolling(window=3).std()
-    
-    df = df.bfill().ffill()
-    
-    # --- YENİ EKLENEN: Regime Detection (Şok Alarmı) ---
-    volatilite_mean = df['Kur_Volatilite_3Ay'].mean()
-    # Kur volatilitesi normalin 2 katından fazlaysa VEYA dondan etkilenmişse 1 (Şok Rejimi)
-    is_shock = (df['Kur_Volatilite_3Ay'] > volatilite_mean * 2)
-    if 'Kritik_Don' in df.columns:
-        is_shock = is_shock | (df['Kritik_Don'] > 0)
-    df['Regime_Shock_Warning'] = np.where(is_shock, 1, 0)
-
-    # --- YENİ EKLENEN: TMO Müdahalesi (Policy Causal Feature) ---
-    # TMO fiyatı devlet tarafından sezon başında açıklanır (Dışsaldır, sızıntı yaratmaz).
-    # TMO fiyatındaki o ayki artış:
-    df['TMO_Fiyat_Artis_Pct'] = df['TMO_Giresun_TL_kg'].pct_change(1) * 100
-    
-    # TMO'nun açıkladığı güncel fiyatın, GEÇEN AYKİ serbest piyasaya göre farkı (Makas)
-    # Makas devasa pozitifse (+%50), serbest piyasa o ay fırlamak zorundadır!
-    df['TMO_Mevcut_Makas_Pct'] = (df['TMO_Giresun_TL_kg'] - df['Serbest_Piyasa_TL_kg'].shift(1)) / df['Serbest_Piyasa_TL_kg'].shift(1) * 100
+    df = apply_feature_engineering(df)
 
     # 3. YASAKLI LİSTE: Mutlak geçmiş fiyatları modele GÖSTERMEYİZ
     yasakli_laglar = [

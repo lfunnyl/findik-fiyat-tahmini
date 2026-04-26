@@ -1,4 +1,4 @@
-# 🌰 Türkiye Fındık Fiyat Tahmin Sistemi (AI/ML)
+# 🌰 Türkiye Fındık Fiyat Tahmin Sistemi (End-to-End AI/ML)
 
 <div align="center">
 
@@ -7,42 +7,53 @@
 ![Next.js](https://img.shields.io/badge/Next.js-Frontend-000000?logo=next.js&logoColor=white)
 ![Machine Learning](https://img.shields.io/badge/ML-Optuna%20%7C%20CatBoost%20%7C%20SHAP-FF6F00)
 
-**End-to-End Commodity Price Forecasting System & Delta Modeling Architecture**  
-*XGBoost · LightGBM · CatBoost · Optuna · Delta Target Transformation · Causal Forcing*
+**Kurumsal Seviye Emtia Fiyat Tahmin ve Karar Destek Sistemi**  
+*XGBoost · LightGBM · CatBoost · Delta Modeling · Causal Inference*
 
 </div>
 
 ---
 
-## 🎯 Proje Amacı
+## 🌟 Proje Nedir?
 
-Türkiye, dünya fındık üretiminin **~%70'ini** tek başına karşılar. Üreticiler ve ihracatçı şirketler için fındık fiyatı tahmini kritik ekonomik kararları doğrudan etkiler. 
+Türkiye, dünya fındık üretiminin **~%70'ini** tek başına karşılayarak küresel piyasada tekel konumundadır. Ancak döviz kurlarındaki dalgalanmalar, iklim şokları (don olayları) ve devletin (TMO) müdahaleleri nedeniyle serbest piyasadaki fındık fiyatlarını öngörmek son derece zordur. Üreticiler ve ihracatçı şirketler için doğru fiyat tahmini, milyonlarca dolarlık kar/zarar anlamına gelir.
 
-Bu proje, 150+ aylık (2013–2026) veriye dayanarak geliştirilmiş, **Otokorelasyon (Momentum) Tuzağı'nı kırmış** ve **%5.06 MAPE** hata payı ile çalışan "Production-Ready" bir Makine Öğrenmesi sistemidir. Proje salt bir script olmaktan çıkarılmış; arka planda **FastAPI** ve ön yüzde modern bir **Next.js Dashboard** ile uçtan uca (End-to-End) bir sisteme dönüştürülmüştür.
+Bu proje, fındık fiyatlarını (Reel USD/kg bazında) **%5.06 MAPE** hata payıyla tahmin edebilen, yatırımcılara ve üreticilere veri odaklı (Data-Driven) bir karar destek mekanizması sunan **uçtan uca (End-to-End)** bir Yapay Zeka platformudur.
 
 ---
 
-## 🧠 Karşılaşılan Makine Öğrenmesi Problemleri ve Çözümler
+## 🏗️ Neler Yaptım? (Proje Kapsamı)
 
-Bu projeyi sıradan tahmin modellerinden ayıran en büyük özellik, finansal zaman serilerinde sıkça düşülen "Yeni başlayan tuzaklarının" (Rookie Traps) profesyonelce çözülmesidir:
+Bu sistemi sıfırdan canlıya (production) alırken şu adımları bizzat tasarladım ve kodladım:
 
-### 1. Momentum Tuzağı (Random Walk) ve Delta Modeling
-* **Problem:** Çoğu zaman serisi modeli (özellikle ağaç tabanlı algoritmalar), bir sonraki ayın fiyatını tahmin ederken tembellik yapıp sadece bir önceki ayın fiyatını kopyalar ($Y_t \approx Y_{t-1}$). Buna "Random Walk" tuzağı denir. Model kağıt üzerinde harika görünür ama gerçek krizleri asla öngöremez.
-* **Çözüm (Delta Modeling):** Hedef değişken (Target), mutlak fiyat yerine **Fiyatın Logaritmik Değişimi (Delta)** olarak değiştirildi ($log(Y_t) - log(Y_{t-1})$). Model artık geçmiş fiyatı değil; kur ivmesini, rekolte şoklarını ve enflasyon oranlarını kullanarak piyasanın **ne yöne hareket edeceğini** öğrenmek zorunda bırakıldı.
+1. **Veri Toplama (Data Engineering):** TCMB (Kur/Enflasyon), TMO (Taban fiyatlar), FAO (Küresel Rekolte) ve Open-Meteo (İklim/Don riski) gibi 14 farklı veri kaynağından 150+ aylık (2013-2026) veriyi otomatik çeken scraper'lar yazdım.
+2. **Özellik Mühendisliği (Feature Engineering):** Sadece fiyatı değil; kur volatilitesini, hareketli ortalamaları (MA), TMO'nun piyasa ile olan fiyat makasını ve iklim şoklarını hesaplayan modüler bir veri boru hattı (Pipeline) kurdum.
+3. **Makine Öğrenmesi (ML Modeling):** XGBoost, LightGBM ve CatBoost algoritmalarını Optuna ile eğittim. Modellerin "kara kutu" olmasını engellemek için **SHAP** entegrasyonu ile kararların şeffafça açıklanmasını sağladım.
+4. **Full-Stack Mimari:** Geliştirdiğim modelleri bir Python script'i olmaktan çıkarıp, **FastAPI** ile bir Backend servisine bağladım. Kullanıcıların tahminleri görebilmesi için **Next.js** ve **TailwindCSS** kullanarak modern bir Dashboard (Frontend) tasarladım.
 
-### 2. Kayıp Nedensellik ve TMO Müdahalesi (Causal Forcing)
-* **Problem:** Ağustos 2025 gibi şok aylarında fiyatın %50 fırladığı görüldü. Ancak iklim (Kritik Don) ve kur stabil görünüyordu. Standart Feature Selection algoritmaları bu şokları "istatistiksel anomali" diyerek görmezden geliyordu.
-* **Çözüm (Causal Forcing):** Piyasayı asıl belirleyen unsurun Toprak Mahsulleri Ofisi'nin (TMO) "Taban Fiyat Açıklaması" olduğu tespit edildi (Domain Knowledge). TMO'nun güncel fiyatı ile geçen ayın serbest piyasası arasındaki makas (`TMO_Mevcut_Makas_Pct`) hesaplandı. Feature Selection algoritmasına müdahale edilerek (Causal Forcing) bu "Şok" değişkenleri modele **zorla VIP özellik** olarak eklendi.
+---
 
-### 3. Ağaç Modellerinin Ekstrapolasyon Limiti
-* **Problem:** XGBoost, LightGBM ve CatBoost gibi algoritmalar, eğitim setinde hiç görmedikleri büyüklükte bir anomaliyle karşılaştıklarında tahmini uzatamazlar (extrapolate edemezler).
-* **Teşhis:** Model normal piyasa koşullarında **%5.06 MAPE** ile mükemmel çalışırken, tarihte eşi benzeri görülmemiş (%50'lik TMO zammı) tekil şok aylarında matematiksel olarak tavan fiyata takılmış (cap limit) ve tutucu davranmıştır. Bu, projenin en büyük "öğrenilmiş derslerinden (lessons learned)" biridir.
+## 🧠 Karşılaştığım Krizler ve Çözümlerim (Lessons Learned)
+
+Her şey kağıt üzerinde mükemmel başlasa da, gerçek dünya verisiyle uğraşırken ve sistemi sunucuya yüklerken ciddi problemlerle yüzleştim. İşte o problemler ve bulduğum mühendislik çözümleri:
+
+### Kriz 1: Momentum (Random Walk) Tuzağı
+* **Problem:** Makine öğrenmesi modellerimi ilk eğittiğimde R² skorum 0.95 çıkmıştı. Ancak detaylı analiz ettiğimde, modelin sadece $Y_t \approx Y_{t-1}$ yaptığını, yani "Bugünkü fiyat neyse yarınki de o olur" diyerek dünkü fiyatı kopyaladığını (tembellik yaptığını) fark ettim. Gerçek krizleri asla öngöremiyordu.
+* **Çözüm (Delta Target Transformation):** Modelin hedefini (Target) mutlak fiyat olarak vermeyi bıraktım. Bunun yerine **Fiyatın Logaritmik Değişimini (Delta)** tahmin etmesini istedim. Model artık dünkü fiyatı kopyalayamıyor; rekolteye, kura ve enflasyona bakarak piyasanın *ne yöne hareket edeceğini* öğrenmek zorunda kalıyordu. 
+
+### Kriz 2: Kayıp Nedensellik ve TMO Müdahalesi
+* **Problem:** Ağustos 2025 gibi aylarda fiyatın bir anda %50 fırladığı dönemler vardı. Ne kurda ne de iklimde bir şok yokken yaşanan bu sıçramaları algoritmalar "anomali" diyerek eliyordu.
+* **Çözüm (Causal Forcing):** Fındık piyasasında fiyatı asıl belirleyen şeyin devletin (TMO) yaptığı taban fiyat müdahaleleri olduğunu (Domain Knowledge) analize dahil ettim. TMO'nun güncel fiyatı ile serbest piyasa arasındaki makası (`TMO_Mevcut_Makas`) hesaplayarak modele **zorla (VIP Feature)** ekledim. Model artık devletin piyasayı yukarı çekeceğini önceden anlayabiliyordu.
+
+### Kriz 3: Monolith'ten Mikroservise Geçiş ve Sunucu Çökmesi
+* **Problem:** Projenin başında veri çekimi, tahmin ve ön yüz aynı dosya (`app.py`) içindeydi. Bu devasa yığını sunucuya (Railway) yüklemeye kalktığımda, ağır ML kütüphaneleri (PyTorch, Prophet vb.) yüzünden RAM sınırları aşılıyor ve sistem kilitleniyordu (Build Timeout).
+* **Çözüm:** Sisteme "Refactoring" uyguladım. Feature Engineering mantığını `src/features/` altına izole ettim. Sadece canlı ortama (Production) özel, ağır kütüphaneleri dışlayan hafifletilmiş bir `requirements-api.txt` yazdım. FastAPI ve Next.js'i birbirinden tamamen ayırarak (Decoupling) derleme süresini dakikalardan 40 saniyeye düşürdüm.
 
 ---
 
 ## 📊 Model Sonuçları (Test Seti — Reel USD/kg)
 
-Test seti (son 30 ay) üzerinde yapılan Optuna destekli Hiperparametre optimizasyonu sonucunda elde edilen metrikler:
+Tüm bu optimizasyonlar sonucunda elde edilen güncel test metrikleri:
 
 | Model | R² | MAE (USD/kg) | RMSE | MAPE |
 |---|---|---|---|---|
@@ -51,31 +62,18 @@ Test seti (son 30 ay) üzerinde yapılan Optuna destekli Hiperparametre optimiza
 | LightGBM (Optuna)| **0.7991** | **0.273** | **0.486** | 5.30% |
 | **CatBoost** | 0.7853 | 0.276 | 0.502 | **5.06%** |
 
-> **Not:** R²'nin negatif değerlerden **0.80**'e çıkması, Delta Modeling mimarisinin piyasa dinamiklerini (kur, ihracat, rekolte) gerçekten "öğrendiğinin" en büyük kanıtıdır.
-
 ---
-
-## 📐 Sistem Mimarisi
-
-```mermaid
-graph TD
-    A[Veri Kaynakları\nKur, Hava, İhracat, TMO] --> B[Feature Engineering\nDelta Target & Causal Features]
-    B --> C[ML Pipeline\nOptuna, XGBoost, CatBoost]
-    C --> D[SHAP API\nExplainable AI]
-    D --> E[FastAPI Backend\nPython]
-    E --> F[Next.js Dashboard\nReact, TypeScript, Vercel]
-```
 
 ## 🚀 Kurulum ve Çalıştırma
 
-Projenin tamamı (Backend + Frontend) tek tıkla ayağa kalkacak şekilde tasarlanmıştır.
+Proje mikroservis mimarisiyle tasarlanmıştır.
 
 ### Gereksinimler
 - Python 3.11+
 - Node.js 18+
 
 ### 1. ML Modellerini Eğitmek (Opsiyonel)
-Veri seti hazır gelir, ancak modelleri baştan eğitmek veya SHAP grafiklerini yeniden üretmek isterseniz:
+Modelleri baştan eğitmek ve SHAP metriklerini üretmek için:
 ```bash
 python src/models/train_model.py
 python scripts/generate_shap.py
