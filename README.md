@@ -7,9 +7,9 @@
 ![Next.js](https://img.shields.io/badge/Next.js-Frontend-000000?logo=next.js&logoColor=white)
 ![Machine Learning](https://img.shields.io/badge/ML-Optuna%20%7C%20CatBoost%20%7C%20SHAP-FF6F00)
 
-**Kurumsal Seviye Emtia Fiyat Tahmin ve Karar Destek Sistemi**  
-*XGBoost · LightGBM · CatBoost · Delta Modeling · Causal Inference*
-
+***Kurumsal Seviye Emtia Fiyat Tahmin ve Karar Destek Sistemi***
+**XGBoost · LightGBM · CatBoost · Delta Modeling · Causal Inference**
+*https://findik-fiyat-tahmini-theta.vercel.app/*
 </div>
 
 ---
